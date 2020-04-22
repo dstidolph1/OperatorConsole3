@@ -81,6 +81,7 @@ protected:
 	bool m_shrinkDisplay;
 	bool m_magnifyDisplay;
 	bool m_DrawRegistrationMarks;
+	int m_over254;
 	CString m_PictureSavingFolder;
 	CString m_PictureBaseName;
 	std::vector<uint8_t> m_imageData;

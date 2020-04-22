@@ -106,7 +106,7 @@ HRESULT VideoCapture::GetCameraFrame(long &sizeBuffer, long *buffer)
     return captureResult;
 }
 
-HRESULT VideoCapture::GetCameraFrame(std::vector<uint8_t>& vidDisplay)
+HRESULT VideoCapture::GetCameraFrame(std::vector<uint8_t>& vidDisplay, int &over254)
 {
 	HRESULT hr = E_FAIL;
 	if (0 == m_cameraFrame.size())
@@ -116,6 +116,7 @@ HRESULT VideoCapture::GetCameraFrame(std::vector<uint8_t>& vidDisplay)
 	size_t length = gWidth * gHeight;
 	long sizeBuffer = gWidth * gHeight * sizeof(uint16_t);
 	hr = GetCameraFrame(sizeBuffer, (long*)&m_cameraFrame[0]);
+	over254 = 0;
 	if (SUCCEEDED(hr))
 	{
 		if (vidDisplay.size() != length)
@@ -129,17 +130,23 @@ HRESULT VideoCapture::GetCameraFrame(std::vector<uint8_t>& vidDisplay)
 			case shift0:
 				*iDest = 0xff & *iSrc;
 				if (0 != (0x300 & *iSrc))
+				{
 					*iDest = 0xff; // white out
+				}
 				break;
 			case shift1:
 				*iDest = 0xff & (*iSrc >> 1);
 				if (0 != (0x200 & *iSrc))
+				{
 					*iDest = 0xff; // white out
+				}
 				break;
 			case shift2:
 				*iDest = 0xff & (*iSrc >> 2);
 				break;
 			}
+			if (*iDest > 254)
+				over254++;
 			iDest++;
 			iSrc++;
 		}

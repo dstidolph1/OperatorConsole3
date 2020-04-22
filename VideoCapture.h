@@ -189,7 +189,7 @@ public:
 
     HRESULT GetCameraFrame(long &sizeBuffer, long *buffer);
 
-	HRESULT GetCameraFrame(std::vector<uint8_t>& vidDisplay);
+	HRESULT GetCameraFrame(std::vector<uint8_t>& vidDisplay, int &over254);
 };
 
 #endif

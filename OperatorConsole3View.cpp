@@ -14,7 +14,7 @@
 #include "OperatorConsole3View.h"
 #include "SaveMultipleFramesInfo.h"
 #include <gdiplus.h>
-#include "MatlabMTFLib_1.h"
+//#include "MatlabMTFLib_1.h"
 
 using namespace Gdiplus;
 
@@ -122,12 +122,12 @@ void COperatorConsole3View::OnDraw(CDC* pDC)
 	if (m_shrinkDisplay)
 	{
 		width = m_width / m_zoomDivision;
-		height = m_width / m_zoomDivision;
+		height = m_height / m_zoomDivision;
 	}
 	else if (m_magnifyDisplay)
 	{
-		width = width * m_zoomMultiplier;
-		height = height * m_zoomMultiplier;
+		width = m_width * m_zoomMultiplier;
+		height = m_height * m_zoomMultiplier;
 	}
 	// Setting the StretchBltMode to COLORONCOLOR eliminates the horrible dithering for grayscale images.
 	SetStretchBltMode(pDC->GetSafeHdc(), COLORONCOLOR);
@@ -233,7 +233,7 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 
 			{
 				WriteLock lock(m_pictureLock);
-				m_vidCapture.GetCameraFrame(m_imageData); // This will load the bitmap with the current frame
+				m_vidCapture.GetCameraFrame(m_imageData, m_over254); // This will load the bitmap with the current frame
 				m_FrameNumber++;
 			}
 			{
@@ -555,7 +555,7 @@ afx_msg void COperatorConsole3View::OnMouseMove(UINT nFlags, CPoint point)
 				color = m_imageData[offset];
 			}
 		}
-		text.Format("Color %d at %d,%d", color, point.x, point.y);
+		text.Format("Color %d at %d,%d - over 254 count = %d", color, point.x, point.y, m_over254);
 		SetStatusBarText(text);
 	}
 	CScrollView::OnMouseMove(nFlags, point);
