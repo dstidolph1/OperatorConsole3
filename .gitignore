@@ -8,12 +8,14 @@
 *.obj
 *.ipch
 *.vcpro
+*.aps
 Debug/
 Release/
 x64/
 *.vcxproj.filters
 *.vcxproj.user
 .vs/
+*.zip
 
 # Precompiled Headers
 *.gch

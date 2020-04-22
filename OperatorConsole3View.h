@@ -39,6 +39,7 @@ public:
 	virtual void OnDraw(CDC* pDC);  // overridden to draw this view
 	virtual BOOL PreCreateWindow(CREATESTRUCT& cs);
 protected:
+	void DrawRegistrationPoint(CDC* pDC, int x, int y);
 	void InitPictureData();
 	void SaveImageToFile(const char* filename);
 	virtual void OnInitialUpdate(); // called first time after construct
@@ -75,6 +76,10 @@ protected:
 	int m_FrameNumber;
 	int m_width;
 	int m_height;
+	int m_zoomDivision;
+	int m_zoomMultiplier;
+	bool m_shrinkDisplay;
+	bool m_magnifyDisplay;
 	bool m_DrawRegistrationMarks;
 	CString m_PictureSavingFolder;
 	CString m_PictureBaseName;
@@ -94,6 +99,12 @@ public:
 	afx_msg void OnMouseMove(UINT nFlags,CPoint point);
 	afx_msg void OnDestroy();
 	afx_msg void OnViewDrawRegistrationMarks();
+	afx_msg void OnViewZoom14();
+	afx_msg void OnViewZoom12();
+	afx_msg void OnViewZoom11();
+	afx_msg void OnViewZoom21();
+	afx_msg void OnViewZoom31();
+	afx_msg void OnViewZoom41();
 };
 
 #ifndef _DEBUG  // debug version in OperatorConsole3View.cpp

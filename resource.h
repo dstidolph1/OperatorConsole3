@@ -86,13 +86,25 @@
 #define ID_CAMERA_SAVESINGLEIMAGETODIS  32776
 #define ID_CAMERA_SAVESEQUENCETODISK    32777
 #define ID_VIEW_DRAWREGISTRATIONMARKS   32778
+#define ID_VIEW_ZOOM1                   32779
+#define ID_VIEW_ZOOM2                   32780
+#define ID_VIEW_ZOOM3                   32781
+#define ID_VIEW_ZOOM4                   32782
+#define ID_VIEW_ZOOM5                   32783
+#define ID_VIEW_ZOOM6                   32784
+#define ID_VIEW_ZOOM14                  32785
+#define ID_VIEW_ZOOM12                  32786
+#define ID_VIEW_ZOOM11                  32787
+#define ID_VIEW_ZOOM21                  32788
+#define ID_VIEW_ZOOM31                  32789
+#define ID_VIEW_ZOOM41                  32790
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        313
-#define _APS_NEXT_COMMAND_VALUE         32779
+#define _APS_NEXT_COMMAND_VALUE         32791
 #define _APS_NEXT_CONTROL_VALUE         1006
 #define _APS_NEXT_SYMED_VALUE           310
 #endif

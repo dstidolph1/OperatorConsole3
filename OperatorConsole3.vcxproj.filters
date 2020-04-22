@@ -69,6 +69,9 @@
     <ClInclude Include="SaveMultipleFramesInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="MatlabMTFLib_1.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="OperatorConsole3.cpp">

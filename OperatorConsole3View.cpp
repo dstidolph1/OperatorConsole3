@@ -14,7 +14,7 @@
 #include "OperatorConsole3View.h"
 #include "SaveMultipleFramesInfo.h"
 #include <gdiplus.h>
-
+#include "MatlabMTFLib_1.h"
 
 using namespace Gdiplus;
 
@@ -40,6 +40,12 @@ BEGIN_MESSAGE_MAP(COperatorConsole3View, CScrollView)
 	ON_WM_MOUSEMOVE()
 	ON_WM_DESTROY()
 	ON_COMMAND(ID_VIEW_DRAWREGISTRATIONMARKS, &COperatorConsole3View::OnViewDrawRegistrationMarks)
+	ON_COMMAND(ID_VIEW_ZOOM14, &COperatorConsole3View::OnViewZoom14)
+	ON_COMMAND(ID_VIEW_ZOOM12, &COperatorConsole3View::OnViewZoom12)
+	ON_COMMAND(ID_VIEW_ZOOM11, &COperatorConsole3View::OnViewZoom11)
+	ON_COMMAND(ID_VIEW_ZOOM21, &COperatorConsole3View::OnViewZoom21)
+	ON_COMMAND(ID_VIEW_ZOOM31, &COperatorConsole3View::OnViewZoom31)
+	ON_COMMAND(ID_VIEW_ZOOM41, &COperatorConsole3View::OnViewZoom41)
 END_MESSAGE_MAP()
 
 // COperatorConsole3View construction/destruction
@@ -57,6 +63,10 @@ COperatorConsole3View::COperatorConsole3View() noexcept
 	m_DrawingPicture = false;
 	m_SaveEveryFrame = false;
 	m_DrawRegistrationMarks = false;
+	m_zoomDivision = 1;
+	m_zoomMultiplier = 1;
+	m_shrinkDisplay = false;
+	m_magnifyDisplay = false;
 	m_programState = eStateWaitForCameraLock;
 	m_FrameNumber = 0;
 	m_MaxSaveFrames = 10;
@@ -79,13 +89,27 @@ BOOL COperatorConsole3View::PreCreateWindow(CREATESTRUCT& cs)
 	return CScrollView::PreCreateWindow(cs);
 }
 
-void DrawRegistrationPoint(CDC *pDC, int x, int y)
+void COperatorConsole3View::DrawRegistrationPoint(CDC *pDC, int x, int y)
 {
-	pDC->Ellipse(x - 53, y - 53, x + 53, y + 53);
-	pDC->MoveTo(x, y - 53);
-	pDC->LineTo(x, y + 53);
-	pDC->MoveTo(x - 53, y);
-	pDC->LineTo(x + 54, y);
+	int radius = 53;
+	if (m_shrinkDisplay)
+	{
+		radius = radius / m_zoomDivision;
+		x = x / m_zoomDivision;
+		y = y / m_zoomDivision;
+	}
+	else if (m_magnifyDisplay)
+	{
+		radius = radius * m_zoomMultiplier;
+		x = x * m_zoomMultiplier;
+		y = y * m_zoomMultiplier;
+	}
+
+	pDC->Ellipse(x - radius, y - radius, x + radius, y + radius);
+	pDC->MoveTo(x, y - radius);
+	pDC->LineTo(x, y + radius);
+	pDC->MoveTo(x - radius, y);
+	pDC->LineTo(x + radius, y);
 }
 
 // COperatorConsole3View drawing
@@ -93,9 +117,21 @@ void COperatorConsole3View::OnDraw(CDC* pDC)
 {
 	CScrollView::OnPrepareDC(pDC, NULL);
 
+	int width = m_width;
+	int height = m_height;
+	if (m_shrinkDisplay)
+	{
+		width = m_width / m_zoomDivision;
+		height = m_width / m_zoomDivision;
+	}
+	else if (m_magnifyDisplay)
+	{
+		width = width * m_zoomMultiplier;
+		height = height * m_zoomMultiplier;
+	}
 	// Setting the StretchBltMode to COLORONCOLOR eliminates the horrible dithering for grayscale images.
 	SetStretchBltMode(pDC->GetSafeHdc(), COLORONCOLOR);
-	::StretchDIBits(pDC->GetSafeHdc(), 0, 0, m_width, m_height, 0, 0, m_width, m_height, LPVOID(&m_imageData[0]), m_pBitmapInfo, DIB_RGB_COLORS, SRCCOPY);
+	::StretchDIBits(pDC->GetSafeHdc(), 0, 0, width, height, 0, 0, m_width, m_height, LPVOID(&m_imageData[0]), m_pBitmapInfo, DIB_RGB_COLORS, SRCCOPY);
 
 	if (m_DrawRegistrationMarks)
 	{
@@ -202,7 +238,9 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 			}
 			{
 				ReadLock lock(m_pictureLock);
-				OnDraw(GetDC());
+				CDC* pDC = GetDC();
+				OnDraw(pDC);
+				ReleaseDC(pDC);
 			}
 			if (m_SaveEveryFrame && (m_SaveFrameCount < m_MaxSaveFrames))
 			{
@@ -543,4 +581,124 @@ void COperatorConsole3View::OnViewDrawRegistrationMarks()
 		CMenu* pMenu = GetParentMenu();
 		pMenu->CheckMenuItem(ID_VIEW_DRAWREGISTRATIONMARKS, MF_UNCHECKED | MF_BYCOMMAND);
 	}
+}
+
+
+void COperatorConsole3View::OnViewZoom14()
+{
+	m_magnifyDisplay = false;
+	m_shrinkDisplay = true;
+	m_zoomDivision = 4;
+	m_zoomMultiplier = 1;
+	CMenu* pMenu = GetParentMenu();
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM14, MF_CHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM12, MF_UNCHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM11, MF_UNCHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM21, MF_UNCHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM31, MF_UNCHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM41, MF_UNCHECKED | MF_BYCOMMAND);
+	CSize sizeTotal;
+	sizeTotal.cx = m_width / 4;
+	sizeTotal.cy = m_height / 4;
+	SetScrollSizes(MM_TEXT, sizeTotal);
+}
+
+
+void COperatorConsole3View::OnViewZoom12()
+{
+	m_magnifyDisplay = false;
+	m_shrinkDisplay = true;
+	m_zoomDivision = 2;
+	m_zoomMultiplier = 1;
+	CMenu* pMenu = GetParentMenu();
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM14, MF_UNCHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM12, MF_CHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM11, MF_UNCHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM21, MF_UNCHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM31, MF_UNCHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM41, MF_UNCHECKED | MF_BYCOMMAND);
+	CSize sizeTotal;
+	sizeTotal.cx = m_width/2;
+	sizeTotal.cy = m_height/2;
+	SetScrollSizes(MM_TEXT, sizeTotal);
+}
+
+
+void COperatorConsole3View::OnViewZoom11()
+{
+	m_magnifyDisplay = false;
+	m_shrinkDisplay = false;
+	m_zoomDivision = 1;
+	m_zoomMultiplier = 1;
+	CMenu* pMenu = GetParentMenu();
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM14, MF_UNCHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM12, MF_UNCHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM11, MF_CHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM21, MF_UNCHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM31, MF_UNCHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM41, MF_UNCHECKED | MF_BYCOMMAND);
+	CSize sizeTotal;
+	sizeTotal.cx = m_width;
+	sizeTotal.cy = m_height;
+	SetScrollSizes(MM_TEXT, sizeTotal);
+}
+
+
+void COperatorConsole3View::OnViewZoom21()
+{
+	m_magnifyDisplay = true;
+	m_shrinkDisplay = false;
+	m_zoomDivision = 1;
+	m_zoomMultiplier = 2;
+	CMenu* pMenu = GetParentMenu();
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM14, MF_UNCHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM12, MF_UNCHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM11, MF_UNCHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM21, MF_CHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM31, MF_UNCHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM41, MF_UNCHECKED | MF_BYCOMMAND);
+	CSize sizeTotal;
+	sizeTotal.cx = m_width*2;
+	sizeTotal.cy = m_height*2;
+	SetScrollSizes(MM_TEXT, sizeTotal);
+}
+
+
+void COperatorConsole3View::OnViewZoom31()
+{
+	m_magnifyDisplay = true;
+	m_shrinkDisplay = false;
+	m_zoomDivision = 1;
+	m_zoomMultiplier = 3;
+	CMenu* pMenu = GetParentMenu();
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM14, MF_UNCHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM12, MF_UNCHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM11, MF_UNCHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM21, MF_UNCHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM31, MF_CHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM41, MF_UNCHECKED | MF_BYCOMMAND);
+	CSize sizeTotal;
+	sizeTotal.cx = m_width*3;
+	sizeTotal.cy = m_height*3;
+	SetScrollSizes(MM_TEXT, sizeTotal);
+}
+
+
+void COperatorConsole3View::OnViewZoom41()
+{
+	m_magnifyDisplay = true;
+	m_shrinkDisplay = false;
+	m_zoomDivision = 1;
+	m_zoomMultiplier = 4;
+	CMenu* pMenu = GetParentMenu();
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM14, MF_UNCHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM12, MF_UNCHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM11, MF_UNCHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM21, MF_UNCHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM31, MF_UNCHECKED | MF_BYCOMMAND);
+	pMenu->CheckMenuItem(ID_VIEW_ZOOM41, MF_CHECKED | MF_BYCOMMAND);
+	CSize sizeTotal;
+	sizeTotal.cx = m_width*4;
+	sizeTotal.cy = m_height*4;
+	SetScrollSizes(MM_TEXT, sizeTotal);
 }
