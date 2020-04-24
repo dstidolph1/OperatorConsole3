@@ -92,6 +92,7 @@ protected:
 	bool m_magnifyDisplay;
 	bool m_DrawRegistrationMarks;
 	bool m_ActiveTestRunning;
+	bool m_RunFocusTest;
 	uint8_t m_maxPixelValueInSquare;
 	CString m_PictureSavingFolder;
 	CString m_PictureBaseName;
@@ -123,6 +124,7 @@ public:
 	afx_msg void OnViewZoom41();
 	afx_msg void OnCameraSaveSingle10BitImageToTiffFile();
 	afx_msg void OnCameraSaveSequence10BitImagesToTiffFiles();
+	afx_msg void OnCameraRunfocustesting();
 };
 
 #ifndef _DEBUG  // debug version in OperatorConsole3View.cpp

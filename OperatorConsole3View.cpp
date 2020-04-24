@@ -60,6 +60,7 @@ BEGIN_MESSAGE_MAP(COperatorConsole3View, CScrollView)
 	ON_COMMAND(ID_VIEW_ZOOM41, &COperatorConsole3View::OnViewZoom41)
 	ON_COMMAND(ID_CAMERA_SAVESINGLE10BITIMAGETOTIFFFILE, &COperatorConsole3View::OnCameraSaveSingle10BitImageToTiffFile)
 	ON_COMMAND(ID_CAMERA_SAVESEQUENCE10BITIMAGESTOTIFFFILES, &COperatorConsole3View::OnCameraSaveSequence10BitImagesToTiffFiles)
+	ON_COMMAND(ID_CAMERA_RUNFOCUSTESTING, &COperatorConsole3View::OnCameraRunfocustesting)
 END_MESSAGE_MAP()
 
 // COperatorConsole3View construction/destruction
@@ -72,7 +73,7 @@ COperatorConsole3View::COperatorConsole3View() noexcept :
 	m_SaveEveryFrame16(false), m_DrawRegistrationMarks(false), m_zoomDivision(1),
 	m_zoomMultiplier(1), m_shrinkDisplay(false), m_magnifyDisplay(false),
 	m_width(PICTURE_WIDTH),	m_height(PICTURE_HEIGHT), m_maxPixelValueInSquare(0), m_FrameNumber(0),
-	m_MaxSaveFrames(10)
+	m_MaxSaveFrames(10), m_RunFocusTest(false)
 {
 	// TODO: add construction code here
 	::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
@@ -259,7 +260,7 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 				CDC* pDC = GetDC();
 				OnDraw(pDC);
 				ReleaseDC(pDC);
-				if (!m_ActiveTestRunning)
+				if (!m_ActiveTestRunning && m_RunFocusTest)
 				{
 					m_ActiveTestRunning = true;
 					memcpy(&m_image8DataTesting[0], &m_image8Data[0], m_image8Data.size()); // Copy to backup which will be tested
@@ -896,5 +897,21 @@ void COperatorConsole3View::OnCameraSaveSequence10BitImagesToTiffFiles()
 		m_SaveEveryFrame16 = false;
 		CMenu* pMenu = GetParentMenu();
 		pMenu->CheckMenuItem(ID_CAMERA_SAVESEQUENCETODISK, MF_UNCHECKED | MF_BYCOMMAND);
+	}
+}
+
+
+void COperatorConsole3View::OnCameraRunfocustesting()
+{
+	m_RunFocusTest = !m_RunFocusTest;
+	if (m_RunFocusTest)
+	{
+		CMenu* pMenu = GetParentMenu();
+		pMenu->CheckMenuItem(ID_CAMERA_RUNFOCUSTESTING, MF_CHECKED | MF_BYCOMMAND);
+	}
+	else
+	{
+		CMenu* pMenu = GetParentMenu();
+		pMenu->CheckMenuItem(ID_CAMERA_RUNFOCUSTESTING, MF_UNCHECKED | MF_BYCOMMAND);
 	}
 }
