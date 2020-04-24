@@ -31,7 +31,8 @@
 #define PICTURE_WIDTH 2592
 #define PICTURE_HEIGHT 1944
 
-typedef enum {
+typedef enum
+{
 	shift2, // Use top 8 bits
 	shift1, // Use middle 8 bits
 	shift0 // Use bottom 8 Bits
@@ -119,9 +120,8 @@ public:
 
 class VideoCapture{
 private:
-	unsigned int gWidth; 
-	unsigned int gHeight;
-	unsigned int gChannels;
+	int gWidth; 
+	int gHeight;
 	ISampleGrabber *pGrabber; 
 	long pBufferSize; 
 	unsigned char* pBuffer; 
@@ -189,7 +189,7 @@ public:
 
     HRESULT GetCameraFrame(long &sizeBuffer, long *buffer);
 
-	HRESULT GetCameraFrame(std::vector<uint8_t>& vidDisplay, int &over254);
+	HRESULT GetCameraFrame(std::vector<uint8_t>& image8Data, std::vector<uint16_t> &image10Data, CRect &rcMaxValue, uint8_t &maxPixelValue);
 };
 
 #endif

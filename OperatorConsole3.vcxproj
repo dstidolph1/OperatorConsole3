@@ -112,16 +112,18 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_WINDOWS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>C:\Program Files\MATLAB\MATLAB Runtime\v98\extern\include</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>26812;26439</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalDependencies>Strmbase.lib; MatlabMTFLib_1.lib</AdditionalDependencies>
+      <AdditionalDependencies>Strmbase.lib; mclmcrrt.lib; MatlabMTFLib_1.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Program Files\MATLAB\MATLAB Runtime\v98\extern\lib\win64\microsoft</AdditionalLibraryDirectories>
     </Link>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -164,7 +166,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -172,12 +174,14 @@
       <PreprocessorDefinitions>_WINDOWS;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>C:\Program Files\MATLAB\MATLAB Runtime\v98\extern\include</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>26812;26439</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>Strmbase.lib; MatlabMTFLib_1.lib</AdditionalDependencies>
+      <AdditionalDependencies>Strmbase.lib; mclmcrrt.lib; MatlabMTFLib_1.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Program Files\MATLAB\MATLAB Runtime\v98\extern\lib\win64\microsoft</AdditionalLibraryDirectories>
     </Link>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -198,6 +202,7 @@
     <ClInclude Include="framework.h" />
     <ClInclude Include="MainFrm.h" />
     <ClInclude Include="MatlabMTFLib_1.h" />
+    <ClInclude Include="MatlabTestCode.h" />
     <ClInclude Include="OperatorConsole3.h" />
     <ClInclude Include="OperatorConsole3Doc.h" />
     <ClInclude Include="OperatorConsole3View.h" />
@@ -215,6 +220,7 @@
     <ClCompile Include="ClassView.cpp" />
     <ClCompile Include="FileView.cpp" />
     <ClCompile Include="MainFrm.cpp" />
+    <ClCompile Include="MatlabTestCode.cpp" />
     <ClCompile Include="OperatorConsole3.cpp" />
     <ClCompile Include="OperatorConsole3Doc.cpp" />
     <ClCompile Include="OperatorConsole3View.cpp" />

@@ -14,16 +14,28 @@
 #include "OperatorConsole3View.h"
 #include "SaveMultipleFramesInfo.h"
 #include <gdiplus.h>
-//#include "MatlabMTFLib_1.h"
+#include <wincodec.h>
+#include "MatlabMTFLib_1.h"
 
 using namespace Gdiplus;
 
 #pragma comment (lib,"Gdiplus.lib")
+#pragma comment(lib, "Windowscodecs.lib")
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
 
+// Global declaration
+
+using _com_util::CheckError;
+using container = std::vector<std::vector<bool>>;
+
+_COM_SMARTPTR_TYPEDEF(IWICImagingFactory, __uuidof(IWICImagingFactory));
+_COM_SMARTPTR_TYPEDEF(IWICBitmapEncoder, __uuidof(IWICBitmapEncoder));
+_COM_SMARTPTR_TYPEDEF(IWICBitmapFrameEncode, __uuidof(IWICBitmapFrameEncode));
+_COM_SMARTPTR_TYPEDEF(IWICStream, __uuidof(IWICStream));
+_COM_SMARTPTR_TYPEDEF(IWICPalette, __uuidof(IWICPalette));
 
 // COperatorConsole3View
 
@@ -46,30 +58,29 @@ BEGIN_MESSAGE_MAP(COperatorConsole3View, CScrollView)
 	ON_COMMAND(ID_VIEW_ZOOM21, &COperatorConsole3View::OnViewZoom21)
 	ON_COMMAND(ID_VIEW_ZOOM31, &COperatorConsole3View::OnViewZoom31)
 	ON_COMMAND(ID_VIEW_ZOOM41, &COperatorConsole3View::OnViewZoom41)
+	ON_COMMAND(ID_CAMERA_SAVESINGLE10BITIMAGETOTIFFFILE, &COperatorConsole3View::OnCameraSaveSingle10BitImageToTiffFile)
+	ON_COMMAND(ID_CAMERA_SAVESEQUENCE10BITIMAGESTOTIFFFILES, &COperatorConsole3View::OnCameraSaveSequence10BitImagesToTiffFiles)
 END_MESSAGE_MAP()
 
 // COperatorConsole3View construction/destruction
 
-COperatorConsole3View::COperatorConsole3View() noexcept
+COperatorConsole3View::COperatorConsole3View() noexcept : 
+	m_ActiveTestRunning(false), m_SaveFrameCount(0), m_programState(eStateWaitForCameraLock),
+	m_pBitmapInfo(nullptr), m_sizeBitmapInfo(0), m_OperatorConsoleLockEngaged(false),
+	m_OperatorConsoleSwitchPressed(false), m_CameraRunning(false), m_ThreadRunning(false),
+	m_ThreadShutdown(false), m_DrawingPicture(false), m_SaveEveryFrame8(false),
+	m_SaveEveryFrame16(false), m_DrawRegistrationMarks(false), m_zoomDivision(1),
+	m_zoomMultiplier(1), m_shrinkDisplay(false), m_magnifyDisplay(false),
+	m_width(PICTURE_WIDTH),	m_height(PICTURE_HEIGHT), m_maxPixelValueInSquare(0), m_FrameNumber(0),
+	m_MaxSaveFrames(10)
 {
 	// TODO: add construction code here
-	m_pBitmapInfo = nullptr;
-	m_sizeBitmapInfo = 0;
-	m_OperatorConsoleLockEngaged = false;
-	m_OperatorConsoleSwitchPressed = false;
-	m_CameraRunning = false;
-	m_ThreadRunning = false;
-	m_ThreadShutdown = false;
-	m_DrawingPicture = false;
-	m_SaveEveryFrame = false;
-	m_DrawRegistrationMarks = false;
-	m_zoomDivision = 1;
-	m_zoomMultiplier = 1;
-	m_shrinkDisplay = false;
-	m_magnifyDisplay = false;
-	m_programState = eStateWaitForCameraLock;
-	m_FrameNumber = 0;
-	m_MaxSaveFrames = 10;
+	::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+	registrationCoordinates.resize(4);
+	registrationCoordinates[0] = CPoint(776, 604);
+	registrationCoordinates[1] = CPoint(1826, 604);
+	registrationCoordinates[2] = CPoint(776, 1396);
+	registrationCoordinates[3] = CPoint(1826, 1396);
 }
 
 COperatorConsole3View::~COperatorConsole3View()
@@ -131,7 +142,7 @@ void COperatorConsole3View::OnDraw(CDC* pDC)
 	}
 	// Setting the StretchBltMode to COLORONCOLOR eliminates the horrible dithering for grayscale images.
 	SetStretchBltMode(pDC->GetSafeHdc(), COLORONCOLOR);
-	::StretchDIBits(pDC->GetSafeHdc(), 0, 0, width, height, 0, 0, m_width, m_height, LPVOID(&m_imageData[0]), m_pBitmapInfo, DIB_RGB_COLORS, SRCCOPY);
+	::StretchDIBits(pDC->GetSafeHdc(), 0, 0, width, height, 0, 0, m_width, m_height, LPVOID(&m_image8Data[0]), m_pBitmapInfo, DIB_RGB_COLORS, SRCCOPY);
 
 	if (m_DrawRegistrationMarks)
 	{
@@ -151,6 +162,7 @@ void COperatorConsole3View::InitPictureData()
 {
 	m_width = PICTURE_WIDTH;
 	m_height = PICTURE_HEIGHT;
+	const auto numPixels = m_width * m_height;
 	if (m_pBitmapInfo)
 	{
 		delete m_pBitmapInfo;
@@ -165,7 +177,7 @@ void COperatorConsole3View::InitPictureData()
 	m_pBitmapInfo->bmiHeader.biBitCount = 8;
 	m_pBitmapInfo->bmiHeader.biPlanes = 1;
 	m_pBitmapInfo->bmiHeader.biCompression = BI_RGB;
-	m_pBitmapInfo->bmiHeader.biSizeImage = m_width * m_height;
+	m_pBitmapInfo->bmiHeader.biSizeImage = numPixels;
 	m_pBitmapInfo->bmiHeader.biClrImportant = 0;
 	m_pBitmapInfo->bmiHeader.biClrUsed = 0;
 	m_pBitmapInfo->bmiHeader.biXPelsPerMeter = 0;
@@ -177,7 +189,9 @@ void COperatorConsole3View::InitPictureData()
 		m_pBitmapInfo->bmiColors[i].rgbBlue = i;
 		m_pBitmapInfo->bmiColors[i].rgbReserved = 0;
 	}
-	m_imageData.resize(m_width * m_height);
+	m_image8Data.resize(numPixels);
+	m_image8DataTesting.resize(numPixels);
+	m_image16Data.resize(numPixels);
 }
 
 void COperatorConsole3View::OnInitialUpdate()
@@ -199,6 +213,8 @@ void COperatorConsole3View::OnInitialUpdate()
 	m_ThreadRunning = false;
 	m_ThreadShutdown = false;
 	m_DrawingPicture = false;
+	m_ActiveTestRunning = false;
+	m_SaveFrameCount = 0;
 	m_programState = eStateWaitForCameraLock;
 	m_FrameNumber = 0;
 	m_MaxSaveFrames = 10;
@@ -226,6 +242,7 @@ OperatorConsoleState COperatorConsole3View::HandleWaitForCameraLock(bool newStat
 
 OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 {
+	CRect rcWhiteSquare(1188,582,1317,733);
 	if (m_OperatorConsoleLockEngaged)
 	{
 		if (m_CameraRunning)
@@ -233,24 +250,50 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 
 			{
 				WriteLock lock(m_pictureLock);
-				m_vidCapture.GetCameraFrame(m_imageData, m_over254); // This will load the bitmap with the current frame
+				m_vidCapture.GetCameraFrame(m_image8Data, m_image16Data, rcWhiteSquare, m_maxPixelValueInSquare); // This will load the bitmap with the current frame
 				m_FrameNumber++;
 			}
+			if (m_maxPixelValueInSquare > 0)
 			{
 				ReadLock lock(m_pictureLock);
 				CDC* pDC = GetDC();
 				OnDraw(pDC);
 				ReleaseDC(pDC);
+				if (!m_ActiveTestRunning)
+				{
+					m_ActiveTestRunning = true;
+					memcpy(&m_image8DataTesting[0], &m_image8Data[0], m_image8Data.size()); // Copy to backup which will be tested
+					AfxBeginThread(AnalyzeFrameThreadProc, this);
+				}
 			}
-			if (m_SaveEveryFrame && (m_SaveFrameCount < m_MaxSaveFrames))
+			if (m_SaveEveryFrame8 && (m_SaveFrameCount < m_MaxSaveFrames))
 			{
+				WriteLock lock(m_pictureLock);
 				CString filename;
 				filename.Format("%s\\%sFrame-%04d.bmp", m_PictureSavingFolder.GetBuffer(), m_PictureBaseName.GetBuffer(), m_FrameNumber);
-				SaveImageToFile(filename);
+				SaveImage8ToFile(filename);
 				m_SaveFrameCount++;
 				if (m_SaveFrameCount >= m_MaxSaveFrames)
 				{
-					m_SaveEveryFrame = false;
+					m_SaveEveryFrame8 = false;
+					CMenu* pMenu = GetParentMenu();
+					if (pMenu)
+						pMenu->CheckMenuItem(ID_CAMERA_SAVESEQUENCETODISK, MF_UNCHECKED | MF_BYCOMMAND);
+
+				}
+			}
+			if (m_SaveEveryFrame16 && (m_SaveFrameCount < m_MaxSaveFrames))
+			{
+				WriteLock lock(m_pictureLock);
+				CStringW filename;
+				CStringW folder = UTF8toUTF16(m_PictureSavingFolder);
+				CStringW baseName = UTF8toUTF16(m_PictureBaseName);
+				filename.Format(L"%s\\%sFrame-%04d.tif", folder.GetBuffer(), baseName.GetBuffer(), m_FrameNumber);
+				SaveImage16ToFile(filename);
+				m_SaveFrameCount++;
+				if (m_SaveFrameCount >= m_MaxSaveFrames)
+				{
+					m_SaveEveryFrame16 = false;
 					CMenu* pMenu = GetParentMenu();
 					if (pMenu)
 						pMenu->CheckMenuItem(ID_CAMERA_SAVESEQUENCETODISK, MF_UNCHECKED | MF_BYCOMMAND);
@@ -289,10 +332,24 @@ OperatorConsoleState COperatorConsole3View::HandleReportResults(bool newState)
 		return eStateWaitForCameraLock;
 }
 
+UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
+{
+	COperatorConsole3View* pThis = (COperatorConsole3View*)pParam;
+	pThis->m_ActiveTestRunning = true;
+	std::vector<int> outputMTF50;
+	bool success = pThis->m_matlabTestCode.RunTestQuickMTF50(pThis->m_image8DataTesting, pThis->m_width, pThis->m_height, pThis->registrationCoordinates, outputMTF50);
+	pThis->m_ActiveTestRunning = false;
+	return 0;
+}
+
 UINT __cdecl COperatorConsole3View::ThreadProc(LPVOID pParam)
 {
 	COperatorConsole3View* pThis = (COperatorConsole3View*)pParam;
 	pThis->m_ThreadRunning = true;
+	HRESULT hr = ::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+	mclmcrInitialize();
+	mclInitializeApplication(NULL, 0);
+	pThis->m_matlabTestCode.Initialize();
 	DWORD dwFrameTime = 1000 / 13; // 66 ms
 	LARGE_INTEGER Frequency;
 	QueryPerformanceFrequency(&Frequency);
@@ -302,6 +359,25 @@ UINT __cdecl COperatorConsole3View::ThreadProc(LPVOID pParam)
 	while (!pThis->m_ThreadShutdown)
 	{
 		::QueryPerformanceCounter(&timeStart);
+		if (pThis->m_OperatorConsoleLockEngaged && !pThis->m_CameraRunning)
+		{
+			HRESULT hr = pThis->m_vidCapture.StartVideoCapture();
+			if (SUCCEEDED(hr))
+			{
+				pThis->m_CameraRunning = true;
+				pThis->m_DrawingPicture = true;
+			}
+			else
+			{
+				pThis->MessageBox("Error from trying to start video capture", "Error from Camera", MB_OK);
+			}
+
+		}
+		if (pThis->m_ThreadShutdown || (!pThis->m_OperatorConsoleLockEngaged && pThis->m_CameraRunning))
+		{
+			pThis->m_vidCapture.vcStopCaptureVideo();
+			pThis->m_CameraRunning = false;
+		}
 		switch (pThis->m_programState)
 		{
 		case eStateWaitForCameraLock:
@@ -338,7 +414,82 @@ UINT __cdecl COperatorConsole3View::ThreadProc(LPVOID pParam)
 	return 0;   // thread completed successfully
 }
 
-void COperatorConsole3View::SaveImageToFile(const char* filename)
+void COperatorConsole3View::SaveImage16ToFile(const wchar_t *pathname)
+{
+	// Create factory
+	IWICImagingFactoryPtr sp_factory { nullptr };
+	HRESULT hr = sp_factory.CreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER);
+	if (SUCCEEDED(hr))
+	{
+		// Create stream
+		IWICStreamPtr sp_stream{ nullptr };
+		hr = sp_factory->CreateStream(&sp_stream);
+		if (SUCCEEDED(hr))
+		{
+			hr = sp_stream->InitializeFromFilename(pathname, GENERIC_WRITE);
+			// Create encoder
+			IWICBitmapEncoderPtr sp_encoder{ nullptr };
+			hr = sp_factory->CreateEncoder(GUID_ContainerFormatTiff, nullptr, &sp_encoder);
+			if (SUCCEEDED(hr))
+			{
+				// Initialize encoder with stream
+				hr = sp_encoder->Initialize(sp_stream, WICBitmapEncoderNoCache);
+				if (SUCCEEDED(hr))
+				{
+					// Create new frame
+					IWICBitmapFrameEncodePtr sp_frame{ nullptr };
+					IPropertyBag2Ptr sp_properties{ nullptr };
+					hr = sp_encoder->CreateNewFrame(&sp_frame, &sp_properties);
+					if (SUCCEEDED(hr))
+					{
+						// This is how you customize the TIFF output.
+						PROPBAG2 option = { 0 };
+						option.pstrName = L"TiffCompressionMethod";
+						VARIANT varValue;
+						VariantInit(&varValue);
+						varValue.vt = VT_UI1;
+						varValue.bVal = WICTiffCompressionZIP;
+						hr = sp_properties->Write(1, &option, &varValue);
+						if (SUCCEEDED(hr))
+						{
+							hr = sp_frame->Initialize(sp_properties);
+						}
+						if (SUCCEEDED(hr))
+						{
+							hr = sp_frame->SetSize(m_width, m_height);
+						}
+						if (SUCCEEDED(hr))
+						{
+							// Set pixel format
+							// SetPixelFormat() requires a pointer to non-const
+							auto pf{ GUID_WICPixelFormat16bppGray };
+							hr = sp_frame->SetPixelFormat(&pf);
+							if (!::IsEqualGUID(pf, GUID_WICPixelFormat16bppGray))
+							{
+								// Report unsupported pixel format
+								CheckError(WINCODEC_ERR_UNSUPPORTEDPIXELFORMAT);
+							}
+						}
+						if (SUCCEEDED(hr))
+						{
+							UINT stride = m_width * 2;
+							UINT bufferSize = m_height * stride;
+							hr = sp_frame->WritePixels(m_height, stride, bufferSize, LPBYTE(&m_image16Data[0]));
+						}
+						// Commit frame
+						if (SUCCEEDED(hr))
+							sp_frame->Commit();
+					}
+					// Commit image
+					if (SUCCEEDED(hr))
+						sp_encoder->Commit();
+				}
+			}
+		}
+	}
+}
+
+void COperatorConsole3View::SaveImage8ToFile(const char* filename)
 {
 	BITMAPFILEHEADER bmfh = { 0 };
 	bmfh.bfType = 0x4d42;  // 'BM'
@@ -356,7 +507,8 @@ void COperatorConsole3View::SaveImageToFile(const char* filename)
 			file.Write((LPVOID)m_pBitmapInfo, m_sizeBitmapInfo);
 			{
 				ReadLock lock(m_pictureLock);
-				file.Write((LPVOID)&m_imageData[0], m_imageData.size());
+				UINT cbSize = UINT(m_image8Data.size());
+				file.Write((LPVOID)&m_image8Data[0], cbSize);
 }
 			file.Close();
 		}
@@ -407,21 +559,10 @@ void COperatorConsole3View::OnCameraOperatorConsoleLock()
 		if (m_OperatorConsoleLockEngaged)
 		{
 			pMenu->CheckMenuItem(ID_CAMERA_OPERATORCONSOLELOCK, MF_CHECKED | MF_BYCOMMAND);
-			HRESULT hr = m_vidCapture.StartVideoCapture();
-			if (SUCCEEDED(hr))
-			{
-				m_CameraRunning = true;
-				m_DrawingPicture = true;
-			}
-			else
-			{
-				MessageBox("Error from trying to start video capture", "Error from Camera", MB_OK);
-			}
 		}
 		else
 		{
 			pMenu->CheckMenuItem(ID_CAMERA_OPERATORCONSOLELOCK, MF_UNCHECKED | MF_BYCOMMAND);
-			m_vidCapture.vcStopCaptureVideo();
 		}
 	}
 }
@@ -429,9 +570,6 @@ void COperatorConsole3View::OnCameraOperatorConsoleLock()
 void COperatorConsole3View::OnDestroy()
 {
 	// TODO: Add your message handler code here and/or call default
-	if (m_CameraRunning)
-		m_vidCapture.vcStopCaptureVideo();
-	m_CameraRunning = false;
 	m_ThreadShutdown = true;
 	while (m_ThreadRunning)
 	{
@@ -500,16 +638,17 @@ void COperatorConsole3View::OnCameraSaveSingleImageToDisk()
 	FileDlg.m_ofn.lpstrInitialDir = m_PictureSavingFolder;
 	if (FileDlg.DoModal() == IDOK)
 	{
+		WriteLock lock(m_pictureLock);
 		m_PictureSavingFolder = FileDlg.GetFolderPath();
 		CString filename = FileDlg.GetPathName();
-		SaveImageToFile(filename);
+		SaveImage8ToFile(filename);
 	}
 }
 
 
 void COperatorConsole3View::OnCameraSaveSequenceToDisk()
 {
-	if (!m_SaveEveryFrame)
+	if (!m_SaveEveryFrame8)
 	{
 		SaveMultipleFramesInfo dlg;
 		SYSTEMTIME now;
@@ -525,14 +664,14 @@ void COperatorConsole3View::OnCameraSaveSequenceToDisk()
 			m_PictureBaseName = dlg.FilenameLeadingText;
 			m_FrameNumber = 0;
 			m_SaveFrameCount = 0;
-			m_SaveEveryFrame = true;
+			m_SaveEveryFrame8 = true;
 			CMenu* pMenu = GetParentMenu();
 			pMenu->CheckMenuItem(ID_CAMERA_SAVESEQUENCETODISK, MF_CHECKED | MF_BYCOMMAND);
 		}
 	}
 	else
 	{
-		m_SaveEveryFrame = false;
+		m_SaveEveryFrame8 = false;
 		CMenu* pMenu = GetParentMenu();
 		pMenu->CheckMenuItem(ID_CAMERA_SAVESEQUENCETODISK, MF_UNCHECKED | MF_BYCOMMAND);
 	}
@@ -552,10 +691,10 @@ afx_msg void COperatorConsole3View::OnMouseMove(UINT nFlags, CPoint point)
 			if ((point.x >= 0) && (point.x <= m_width))
 			{
 				int offset = point.y * m_width + point.x;
-				color = m_imageData[offset];
+				color = m_image8Data[offset];
 			}
 		}
-		text.Format("Color %d at %d,%d - over 254 count = %d", color, point.x, point.y, m_over254);
+		text.Format("Color %d at %d,%d - highest pixel value in white square = %d", color, point.x, point.y, m_maxPixelValueInSquare);
 		SetStatusBarText(text);
 	}
 	CScrollView::OnMouseMove(nFlags, point);
@@ -701,4 +840,61 @@ void COperatorConsole3View::OnViewZoom41()
 	sizeTotal.cx = m_width*4;
 	sizeTotal.cy = m_height*4;
 	SetScrollSizes(MM_TEXT, sizeTotal);
+}
+
+CStringW COperatorConsole3View::UTF8toUTF16(const CStringA& utf8)
+{
+	CStringW utf16;
+	int len = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, NULL, 0);
+	if (len > 1)
+	{
+		wchar_t* ptr = utf16.GetBuffer(len - 1);
+		if (ptr) MultiByteToWideChar(CP_UTF8, 0, utf8, -1, ptr, len);
+		utf16.ReleaseBuffer();
+	}
+	return utf16;
+}
+void COperatorConsole3View::OnCameraSaveSingle10BitImageToTiffFile()
+{
+	char strFilter[] = { "TIF Files (*.tif)|*.tif|" };
+	CFileDialog FileDlg(FALSE, CString(".tif"), NULL, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, CString(strFilter), this, 0, TRUE);
+	FileDlg.m_ofn.lpstrInitialDir = m_PictureSavingFolder;
+	if (FileDlg.DoModal() == IDOK)
+	{
+		WriteLock lock(m_pictureLock);
+		m_PictureSavingFolder = FileDlg.GetFolderPath();
+		CStringW filename = UTF8toUTF16(FileDlg.GetPathName());
+		SaveImage16ToFile(filename);
+	}
+}
+
+void COperatorConsole3View::OnCameraSaveSequence10BitImagesToTiffFiles()
+{
+	if (!m_SaveEveryFrame16)
+	{
+		SaveMultipleFramesInfo dlg;
+		SYSTEMTIME now;
+		GetLocalTime(&now);
+		m_PictureBaseName.Format("%04d-%02d-%02d_%02d-%02d-%02d_", now.wYear, now.wMonth, now.wDay, now.wHour, now.wMinute, now.wSecond);
+		dlg.FilenameLeadingText = m_PictureBaseName;
+		dlg.MaxFrameCount = std::to_string(m_MaxSaveFrames).c_str();
+		dlg.FolderPath = m_PictureSavingFolder;
+		if (dlg.DoModal() == IDOK)
+		{
+			m_PictureSavingFolder = dlg.FolderPath;
+			m_MaxSaveFrames = atoi(dlg.MaxFrameCount.GetBuffer());
+			m_PictureBaseName = dlg.FilenameLeadingText;
+			m_FrameNumber = 0;
+			m_SaveFrameCount = 0;
+			m_SaveEveryFrame16 = true;
+			CMenu* pMenu = GetParentMenu();
+			pMenu->CheckMenuItem(ID_CAMERA_SAVESEQUENCETODISK, MF_CHECKED | MF_BYCOMMAND);
+		}
+	}
+	else
+	{
+		m_SaveEveryFrame16 = false;
+		CMenu* pMenu = GetParentMenu();
+		pMenu->CheckMenuItem(ID_CAMERA_SAVESEQUENCETODISK, MF_UNCHECKED | MF_BYCOMMAND);
+	}
 }

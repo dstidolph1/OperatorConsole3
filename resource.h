@@ -98,13 +98,15 @@
 #define ID_VIEW_ZOOM21                  32788
 #define ID_VIEW_ZOOM31                  32789
 #define ID_VIEW_ZOOM41                  32790
+#define ID_CAMERA_SAVESINGLE10BITIMAGETOTIFFFILE 32791
+#define ID_CAMERA_SAVESEQUENCE10BITIMAGESTOTIFFFILES 32792
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        313
-#define _APS_NEXT_COMMAND_VALUE         32791
+#define _APS_NEXT_COMMAND_VALUE         32793
 #define _APS_NEXT_CONTROL_VALUE         1006
 #define _APS_NEXT_SYMED_VALUE           310
 #endif

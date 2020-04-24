@@ -6,6 +6,12 @@
 
 #include <vector>
 #include <shared_mutex>
+#include <Windows.h>
+#include <comdef.h>
+#include <comip.h>
+#include <comutil.h>
+#include <wincodec.h>
+#include "MatlabTestCode.h"
 
 typedef std::shared_mutex Lock;
 typedef std::unique_lock< Lock >  WriteLock;
@@ -39,11 +45,14 @@ public:
 	virtual void OnDraw(CDC* pDC);  // overridden to draw this view
 	virtual BOOL PreCreateWindow(CREATESTRUCT& cs);
 protected:
+	CStringW UTF8toUTF16(const CStringA& utf8);
 	void DrawRegistrationPoint(CDC* pDC, int x, int y);
 	void InitPictureData();
-	void SaveImageToFile(const char* filename);
+	void SaveImage8ToFile(const char* filename);
+	void SaveImage16ToFile(const wchar_t* filename);
 	virtual void OnInitialUpdate(); // called first time after construct
 	static UINT __cdecl ThreadProc(LPVOID pParam);
+	static UINT __cdecl AnalyzeFrameThreadProc(LPVOID pParam);
 	OperatorConsoleState HandleWaitForCameraLock(bool newState);
 	OperatorConsoleState HandleFocusingCamera(bool newState);
 	OperatorConsoleState HandleTestingCamera(bool newState);
@@ -70,7 +79,8 @@ protected:
 	bool m_ThreadRunning;
 	bool m_ThreadShutdown;
 	bool m_CameraRunning;
-	bool m_SaveEveryFrame;
+	bool m_SaveEveryFrame8;
+	bool m_SaveEveryFrame16;
 	int m_SaveFrameCount;
 	int m_MaxSaveFrames;
 	int m_FrameNumber;
@@ -81,11 +91,16 @@ protected:
 	bool m_shrinkDisplay;
 	bool m_magnifyDisplay;
 	bool m_DrawRegistrationMarks;
-	int m_over254;
+	bool m_ActiveTestRunning;
+	uint8_t m_maxPixelValueInSquare;
 	CString m_PictureSavingFolder;
 	CString m_PictureBaseName;
-	std::vector<uint8_t> m_imageData;
+	std::vector<uint8_t> m_image8Data, m_image8DataTesting;
+	std::vector<uint16_t> m_image16Data;
 	OperatorConsoleState m_programState;
+	MatlabTestCode m_matlabTestCode;
+	std::vector<CPoint> registrationCoordinates;
+
 // Generated message map functions
 protected:
 	DECLARE_MESSAGE_MAP()
@@ -106,6 +121,8 @@ public:
 	afx_msg void OnViewZoom21();
 	afx_msg void OnViewZoom31();
 	afx_msg void OnViewZoom41();
+	afx_msg void OnCameraSaveSingle10BitImageToTiffFile();
+	afx_msg void OnCameraSaveSequence10BitImagesToTiffFiles();
 };
 
 #ifndef _DEBUG  // debug version in OperatorConsole3View.cpp

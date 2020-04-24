@@ -167,6 +167,3 @@ void COperatorConsole3App::OnAppAbout()
 }
 
 // COperatorConsole3App message handlers
-
-
-

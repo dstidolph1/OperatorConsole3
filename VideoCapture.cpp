@@ -106,49 +106,60 @@ HRESULT VideoCapture::GetCameraFrame(long &sizeBuffer, long *buffer)
     return captureResult;
 }
 
-HRESULT VideoCapture::GetCameraFrame(std::vector<uint8_t>& vidDisplay, int &over254)
+HRESULT VideoCapture::GetCameraFrame(std::vector<uint8_t>& image8Data, std::vector<uint16_t> &image10Data, CRect &rcMaxValue, uint8_t& maxPixelValue)
 {
 	HRESULT hr = E_FAIL;
-	if (0 == m_cameraFrame.size())
-	{
-		m_cameraFrame.resize(gWidth * gHeight);
-	}
 	size_t length = gWidth * gHeight;
-	long sizeBuffer = gWidth * gHeight * sizeof(uint16_t);
-	hr = GetCameraFrame(sizeBuffer, (long*)&m_cameraFrame[0]);
-	over254 = 0;
+	long size16Buffer = gWidth * gHeight * long(sizeof(uint16_t));
+	if (0 == image10Data.size())
+	{
+		image10Data.resize(gWidth * gHeight);
+	}
+	hr = GetCameraFrame(size16Buffer, (long*)&image10Data[0]);
+	maxPixelValue = 0;
 	if (SUCCEEDED(hr))
 	{
-		if (vidDisplay.size() != length)
-			vidDisplay.resize(length);
-		auto iSrc = m_cameraFrame.begin();
-		auto iDest = vidDisplay.begin();
-		while (iSrc != m_cameraFrame.end())
+		if (image8Data.size() != length)
+			image8Data.resize(length);
+		auto iSrc = image10Data.begin();
+		auto iDest8 = image8Data.begin();
+		for (int y = 0; y < gHeight; y++)
 		{
-			switch (m_BitShift)
+			bool inRectRows = (y >= rcMaxValue.top) && (y <= rcMaxValue.bottom);
+			for (int x = 0; x < gWidth; x++)
 			{
-			case shift0:
-				*iDest = 0xff & *iSrc;
-				if (0 != (0x300 & *iSrc))
+				switch (m_BitShift)
 				{
-					*iDest = 0xff; // white out
+				case shift0:
+					*iDest8 = 0xff & *iSrc;
+					if (0 != (0x300 & *iSrc))
+					{
+						*iDest8 = 0xff; // white out
+					}
+					break;
+				case shift1:
+					*iDest8 = 0xff & (*iSrc >> 1);
+					if (0 != (0x200 & *iSrc))
+					{
+						*iDest8 = 0xff; // white out
+					}
+					break;
+				case shift2:
+					*iDest8 = 0xff & (*iSrc >> 2);
+					break;
 				}
-				break;
-			case shift1:
-				*iDest = 0xff & (*iSrc >> 1);
-				if (0 != (0x200 & *iSrc))
+				if (inRectRows)
 				{
-					*iDest = 0xff; // white out
+					if ((x >= rcMaxValue.left) && (x <= rcMaxValue.right))
+					{
+						if (*iDest8 > maxPixelValue)
+							maxPixelValue = *iDest8;
+					}
 				}
-				break;
-			case shift2:
-				*iDest = 0xff & (*iSrc >> 2);
-				break;
+				*iSrc = *iSrc << 6;
+				iDest8++;
+				iSrc++;
 			}
-			if (*iDest > 254)
-				over254++;
-			iDest++;
-			iSrc++;
 		}
 	}
 	return hr;
@@ -158,7 +169,7 @@ HRESULT VideoCapture::irled_pulse_msec(float msec)
 {
 	//if (msec > 15.0f) msec = 15.0f;
 
-	long lmsec = msec * 1000.0f;
+	long lmsec = long(msec * 1000.0f);
 
 	//
 	HRESULT hr = 0;
@@ -270,7 +281,7 @@ VideoCapture::VideoCapture()
 
 HRESULT VideoCapture::InitCOM(){
 
-	HRESULT nResult = CoInitialize(NULL); 
+	HRESULT nResult = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
 	if (FAILED(nResult))
 	{
 		fprintf(stderr, "ERROR: Unable to initialize the COM library on this Threasd..\n");
@@ -521,7 +532,6 @@ void VideoCapture::sgCloseSampleGrabber()
 
         gWidth = 0;
         gHeight = 0;
-        gChannels = 0;
 }
 
 HRESULT VideoCapture::sgAddSampleGrabber(IGraphBuilder *pGraph)
@@ -550,7 +560,6 @@ HRESULT VideoCapture::sgGetSampleGrabberMediaType(ISampleGrabber *pGrabber)
         }
 
         VIDEOINFOHEADER *pVih = (VIDEOINFOHEADER *)mt.pbFormat;
-        gChannels = pVih->bmiHeader.biBitCount / 8;
         gWidth = pVih->bmiHeader.biWidth;
         gHeight = pVih->bmiHeader.biHeight;
 
@@ -577,12 +586,6 @@ unsigned int VideoCapture::sgGetDataHeight()
 {
         return gHeight;
 }
-
-unsigned int VideoCapture::sgGetDataChannels()
-{
-        return gChannels;
-}
-
 
 HRESULT VideoCapture::GetInterfaces()
 {
@@ -851,7 +854,6 @@ HRESULT VideoCapture::StartVideoCapture(){
 						VIDEOINFOHEADER *pVih = (VIDEOINFOHEADER*)pmtConfig->pbFormat;
 						gWidth = pVih->bmiHeader.biWidth;
                         gHeight = pVih->bmiHeader.biHeight;	
-						gChannels = pVih->bmiHeader.biBitCount / 8;
 						pConfig->SetFormat(pmtConfig);
 						printf("*gWidth....%d\n", gWidth);
 						printf("*gHeight....%d\n", gHeight);
@@ -867,7 +869,6 @@ HRESULT VideoCapture::StartVideoCapture(){
 						VIDEOINFOHEADER *pVih = (VIDEOINFOHEADER*)pmtConfig->pbFormat;
 						gWidth = pVih->bmiHeader.biWidth;
                         gHeight = pVih->bmiHeader.biHeight;	
-						gChannels = pVih->bmiHeader.biBitCount / 8;
 						pConfig->SetFormat(pmtConfig);
 						printf("*gWidth....%d\n", gWidth);
 						printf("*gHeight....%d\n", gHeight);
