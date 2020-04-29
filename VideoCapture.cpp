@@ -300,7 +300,8 @@ IPin* VideoCapture::GetPin(IBaseFilter *pFilter, PIN_DIRECTION PinDir)
     {
         PIN_DIRECTION PinDirThis;
         pPin->QueryDirection(&PinDirThis);
-        if (bFound = (PinDir == PinDirThis))
+		bFound = (PinDir == PinDirThis);
+        if (bFound)
             break;
         pPin->Release();
     }
@@ -308,7 +309,7 @@ IPin* VideoCapture::GetPin(IBaseFilter *pFilter, PIN_DIRECTION PinDir)
     return (bFound ? pPin : 0);  
 }
 
-HRESULT VideoCapture::FindCaptureDevice(int eye, TCHAR *CameraFriendlyName, IBaseFilter **ppSrcFilter)
+HRESULT VideoCapture::FindCaptureDevice(int /*eye*/, TCHAR * /*CameraFriendlyName*/, IBaseFilter **ppSrcFilter)
 {
 	HRESULT hr;
 	IBaseFilter *pSrc = NULL;
@@ -418,7 +419,7 @@ HRESULT VideoCapture::FindCaptureDevice(int eye, TCHAR *CameraFriendlyName, IBas
 	return hr;
 }
 
-HRESULT VideoCapture::sgSetSampleGrabberMediaType(ISampleGrabber *pGrabber)
+HRESULT VideoCapture::sgSetSampleGrabberMediaType(ISampleGrabber *pGrab)
 {
         AM_MEDIA_TYPE mt;
         ZeroMemory(&mt, sizeof(AM_MEDIA_TYPE));
@@ -440,12 +441,12 @@ HRESULT VideoCapture::sgSetSampleGrabberMediaType(ISampleGrabber *pGrabber)
 
 		//mt.subtype = MEDIASUBTYPE_EYELOCK_GREY_LOW_10_OF_16; 
 		//mt.subtype = MEDIASUBTYPE_YUY2; 
-        HRESULT hr = pGrabber->SetMediaType(&mt);
+        HRESULT hr = pGrab->SetMediaType(&mt);
         if (FAILED(hr)) {
 			return hr;
 			/*
 			mt.subtype = MEDIASUBTYPE_YUY2; 
-			hr = pGrabber->SetMediaType(&mt);
+			hr = pGrab->SetMediaType(&mt);
 			printf("***Success GUID \n"); 
 			if (FAILED(hr)){ 
 
@@ -458,21 +459,21 @@ HRESULT VideoCapture::sgSetSampleGrabberMediaType(ISampleGrabber *pGrabber)
 			*/
         }
 		//printf("***Success GUID \n"); 
-        hr = pGrabber->SetOneShot(FALSE);
-        hr = pGrabber->SetBufferSamples(TRUE);
+        hr = pGrab->SetOneShot(FALSE);
+        hr = pGrab->SetBufferSamples(TRUE);
         return hr;
 }
 
-unsigned char*  VideoCapture::sgGrabData(ISampleGrabber *pGrabber)
+unsigned char*  VideoCapture::sgGrabData(ISampleGrabber *pGrab)
 {
         HRESULT hr;
 
-        if (pGrabber == 0)
+        if (pGrab == 0)
                 return 0;
 
 		long Size = 1920*1080*2; 
         // long Size = 0;
-        hr = pGrabber->GetCurrentBuffer(&Size, NULL);
+        hr = pGrab->GetCurrentBuffer(&Size, NULL);
         if (FAILED(hr))
                 return 0;
         else if (Size != pBufferSize) {
@@ -482,7 +483,7 @@ unsigned char*  VideoCapture::sgGrabData(ISampleGrabber *pGrabber)
                 pBuffer = new unsigned char[pBufferSize];
         }
 
-        hr = pGrabber->GetCurrentBuffer(&pBufferSize, (long*)pBuffer);
+        hr = pGrab->GetCurrentBuffer(&pBufferSize, (long*)pBuffer);
         if (FAILED(hr))
 			return 0;
 		else {        
@@ -551,10 +552,10 @@ HRESULT VideoCapture::sgAddSampleGrabber(IGraphBuilder *pGraph)
         return hr;
 }
 
-HRESULT VideoCapture::sgGetSampleGrabberMediaType(ISampleGrabber *pGrabber)
+HRESULT VideoCapture::sgGetSampleGrabberMediaType(ISampleGrabber * pGrab)
 {
         AM_MEDIA_TYPE mt;
-        HRESULT hr = pGrabber->GetConnectedMediaType(&mt);
+        HRESULT hr = pGrab->GetConnectedMediaType(&mt);
         if (FAILED(hr)) {
                 return hr;
         }
@@ -727,14 +728,14 @@ HRESULT VideoCapture::vcCaptureVideo()
                 Msg(TEXT("Couldn't set the SampleGrabber media type!  hr=0x%x"), hr);
                 return hr;
         }
-        IBaseFilter* pGrabber = sgGetBaseFilter();
+        IBaseFilter* pGrab = sgGetBaseFilter();
 
 
         // Render the preview pin on the video capture filter
         // Use this instead of g_pGraph->RenderFile
         
         hr = pCaptureGraphBuilder2->RenderStream(&PIN_CATEGORY_PREVIEW, &MEDIATYPE_Video,
-                                      pSrcFilter, pGrabber/*NULL*/, NULL);
+                                      pSrcFilter, pGrab/*NULL*/, NULL);
         if (FAILED(hr)) {
                 Msg(TEXT("Couldn't render the video capture stream.  hr=0x%x\r\n")
                     TEXT("The capture device may already be in use by another application.\r\n\r\n")

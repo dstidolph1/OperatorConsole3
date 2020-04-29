@@ -9,6 +9,8 @@
 #include "PropertiesWnd.h"
 
 #define WM_UPDATE_STATUS_TEXT WM_USER+1
+#define WM_UPDATE_FOCUS_TEST WM_USER+2
+#define MSG_SET_CAMERA_INFO WM_USER+3
 
 class CMainFrame : public CFrameWnd
 {
@@ -50,6 +52,8 @@ protected:
 	afx_msg void OnUpdateApplicationLook(CCmdUI* pCmdUI);
 	afx_msg void OnSettingChange(UINT uFlags, LPCTSTR lpszSection);
 	afx_msg LRESULT UpdateStatusText(WPARAM wParam, LPARAM lParam);
+	afx_msg LRESULT UpdateFocusTestData(WPARAM wParam, LPARAM lParam);
+	afx_msg LRESULT SetCameraInfo(WPARAM wParam, LPARAM lParam);
 	DECLARE_MESSAGE_MAP()
 
 	BOOL CreateDockingWindows();

@@ -69,10 +69,10 @@
     <ClInclude Include="SaveMultipleFramesInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="MatlabMTFLib_1.h">
+    <ClInclude Include="MatlabTestCode.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="MatlabTestCode.h">
+    <ClInclude Include="MatlabMTF50\MatlabMTF50Lib_2.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

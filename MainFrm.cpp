@@ -7,6 +7,7 @@
 #include "OperatorConsole3.h"
 
 #include "MainFrm.h"
+#include "CameraInfoParser.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -22,6 +23,8 @@ BEGIN_MESSAGE_MAP(CMainFrame, CFrameWnd)
 	ON_UPDATE_COMMAND_UI_RANGE(ID_VIEW_APPLOOK_WIN_2000, ID_VIEW_APPLOOK_WINDOWS_7, &CMainFrame::OnUpdateApplicationLook)
 	ON_WM_SETTINGCHANGE()
 	ON_MESSAGE(WM_UPDATE_STATUS_TEXT, UpdateStatusText)
+	ON_MESSAGE(WM_UPDATE_FOCUS_TEST, UpdateFocusTestData)
+	ON_MESSAGE(MSG_SET_CAMERA_INFO, SetCameraInfo)
 END_MESSAGE_MAP()
 
 static UINT indicators[] =
@@ -244,6 +247,17 @@ void CMainFrame::OnSettingChange(UINT uFlags, LPCTSTR lpszSection)
 	m_wndOutput.UpdateFonts();
 }
 
+
+LRESULT CMainFrame::UpdateFocusTestData(WPARAM wParam, LPARAM lParam)
+{
+	UNREFERENCED_PARAMETER(wParam);
+	UNREFERENCED_PARAMETER(lParam);
+	m_wndStatusBar.SetPaneText(0, (const char*)wParam);
+	// Handle message here.
+
+	return 0;
+}
+
 LRESULT CMainFrame::UpdateStatusText(WPARAM wParam, LPARAM lParam)
 {
 	UNREFERENCED_PARAMETER(wParam);
@@ -251,5 +265,17 @@ LRESULT CMainFrame::UpdateStatusText(WPARAM wParam, LPARAM lParam)
 	m_wndStatusBar.SetPaneText(0, (const char*)wParam);
 	// Handle message here.
 
+	return 0;
+}
+
+LRESULT CMainFrame::SetCameraInfo(WPARAM wParam, LPARAM lParam)
+{
+	UNREFERENCED_PARAMETER(wParam);
+	// Handle message here.
+	CameraInfoParser* pCameraInfo = reinterpret_cast<CameraInfoParser*>(lParam);
+	if (pCameraInfo)
+	{
+
+	}
 	return 0;
 }

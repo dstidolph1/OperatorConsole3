@@ -15,7 +15,9 @@
 #include "SaveMultipleFramesInfo.h"
 #include <gdiplus.h>
 #include <wincodec.h>
-#include "MatlabMTFLib_1.h"
+#include <fstream>
+#include "MatlabTestCode.h"
+#include "MainFrm.h"
 
 using namespace Gdiplus;
 
@@ -73,15 +75,17 @@ COperatorConsole3View::COperatorConsole3View() noexcept :
 	m_SaveEveryFrame16(false), m_DrawRegistrationMarks(false), m_zoomDivision(1),
 	m_zoomMultiplier(1), m_shrinkDisplay(false), m_magnifyDisplay(false),
 	m_width(PICTURE_WIDTH),	m_height(PICTURE_HEIGHT), m_maxPixelValueInSquare(0), m_FrameNumber(0),
-	m_MaxSaveFrames(10), m_RunFocusTest(false)
+	m_MaxSaveFrames(10), m_RunFocusTest(false), m_pBitmapInfoSaved(nullptr), m_ShutdownEvent(FALSE, TRUE, NULL, NULL),
+	m_FocusImageReadyEvent(FALSE, TRUE, NULL, NULL), m_DrawFocusTestResults(false)
 {
 	// TODO: add construction code here
 	::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
 	registrationCoordinates.resize(4);
-	registrationCoordinates[0] = CPoint(776, 604);
-	registrationCoordinates[1] = CPoint(1826, 604);
-	registrationCoordinates[2] = CPoint(776, 1396);
-	registrationCoordinates[3] = CPoint(1826, 1396);
+	registrationCoordinates[0] = CPoint(775, 604);
+	registrationCoordinates[1] = CPoint(1825, 603);
+	registrationCoordinates[2] = CPoint(1834, 1397);
+	registrationCoordinates[3] = CPoint(776, 1395);
+	
 }
 
 COperatorConsole3View::~COperatorConsole3View()
@@ -99,6 +103,12 @@ BOOL COperatorConsole3View::PreCreateWindow(CREATESTRUCT& cs)
 	//  the CREATESTRUCT cs
 
 	return CScrollView::PreCreateWindow(cs);
+}
+
+void COperatorConsole3View::DisplayFocusResult(CDC* pDC, int x, int y, int value)
+{
+	CString sValue(std::to_string(value).c_str());
+	pDC->TextOut(x, y, sValue);
 }
 
 void COperatorConsole3View::DrawRegistrationPoint(CDC *pDC, int x, int y)
@@ -150,12 +160,20 @@ void COperatorConsole3View::OnDraw(CDC* pDC)
 		HGDIOBJ originalPen = pDC->SelectObject(GetStockObject(DC_PEN));
 		HGDIOBJ originalBrush = pDC->SelectObject(GetStockObject(HOLLOW_BRUSH));
 		pDC->SetDCPenColor(RGB(0, 255, 0));
-		DrawRegistrationPoint(pDC, 776, 605);
-		DrawRegistrationPoint(pDC, 1826,604);
-		DrawRegistrationPoint(pDC, 776, 1396);
-		DrawRegistrationPoint(pDC, 1827, 1397);
+		DrawRegistrationPoint(pDC, 775, 604);
+		DrawRegistrationPoint(pDC, 1825,603);
+		DrawRegistrationPoint(pDC, 1834, 1397);
+		DrawRegistrationPoint(pDC, 776, 1395);
 		pDC->SelectObject(originalPen);
 		pDC->SelectObject(originalBrush);
+	}
+	if (m_DrawFocusTestResults)
+	{
+		DisplayFocusResult(pDC, 1201, 515, m_focusTestingResults[0]);
+		DisplayFocusResult(pDC, 815,  880, m_focusTestingResults[1]);
+		DisplayFocusResult(pDC, 1205, 1145, m_focusTestingResults[2]);
+		DisplayFocusResult(pDC, 1700, 950, m_focusTestingResults[3]);
+		DisplayFocusResult(pDC, 1180, 1450, m_focusTestingResults[4]);
 	}
 }
 
@@ -219,11 +237,13 @@ void COperatorConsole3View::OnInitialUpdate()
 	m_programState = eStateWaitForCameraLock;
 	m_FrameNumber = 0;
 	m_MaxSaveFrames = 10;
+	LoadImage8ToFile(".\\CenteredImageAt150.bmp");
 	HRESULT hr = m_vidCapture.InitCOM();
 	if (SUCCEEDED(hr))
 	{
 		OnCameraUseTop8Bits();
 		AfxBeginThread(ThreadProc, this); // <<== START THE THREAD
+		AfxBeginThread(AnalyzeFrameThreadProc, this);
 	}
 	else
 	{
@@ -243,6 +263,11 @@ OperatorConsoleState COperatorConsole3View::HandleWaitForCameraLock(bool newStat
 
 OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 {
+	if (newState)
+	{
+		m_vidCapture.ReadCameraInfo(m_CameraInfo);
+		PostMessage(MSG_SET_CAMERA_INFO, 0, reinterpret_cast<LPARAM>(&m_CameraInfo));
+	}
 	CRect rcWhiteSquare(1188,582,1317,733);
 	if (m_OperatorConsoleLockEngaged)
 	{
@@ -264,7 +289,8 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 				{
 					m_ActiveTestRunning = true;
 					memcpy(&m_image8DataTesting[0], &m_image8Data[0], m_image8Data.size()); // Copy to backup which will be tested
-					AfxBeginThread(AnalyzeFrameThreadProc, this);
+					//memcpy(&m_image8DataTesting[0], &m_savedImageData[0], m_savedImageData.size()); // Copy to backup which will be tested
+					m_FocusImageReadyEvent.SetEvent();
 				}
 			}
 			if (m_SaveEveryFrame8 && (m_SaveFrameCount < m_MaxSaveFrames))
@@ -336,10 +362,39 @@ OperatorConsoleState COperatorConsole3View::HandleReportResults(bool newState)
 UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 {
 	COperatorConsole3View* pThis = (COperatorConsole3View*)pParam;
-	pThis->m_ActiveTestRunning = true;
-	std::vector<int> outputMTF50;
-	bool success = pThis->m_matlabTestCode.RunTestQuickMTF50(pThis->m_image8DataTesting, pThis->m_width, pThis->m_height, pThis->registrationCoordinates, outputMTF50);
-	pThis->m_ActiveTestRunning = false;
+	HRESULT hr = ::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+	if (SUCCEEDED(hr) && pThis->m_matlabTestCode.Initialize())
+	{
+		LARGE_INTEGER Frequency;
+		QueryPerformanceFrequency(&Frequency);
+		LARGE_INTEGER timeStart, timeEnd;
+		bool stateChange = true;
+		OperatorConsoleState nextState = pThis->m_programState;
+		HANDLE handles[2];
+		handles[0] = pThis->m_ShutdownEvent;
+		handles[1] = pThis->m_FocusImageReadyEvent;
+		while (!pThis->m_ThreadShutdown)
+		{
+			DWORD waitResult = WaitForMultipleObjects(2, handles, FALSE, INFINITE);
+			if ((WAIT_OBJECT_0+1) == waitResult)
+			{
+				::QueryPerformanceCounter(&timeStart);
+				pThis->m_ActiveTestRunning = true;
+				bool success = pThis->m_matlabTestCode.RunTestQuickMTF50(pThis->m_image8DataTesting, pThis->m_width, pThis->m_height, pThis->registrationCoordinates, pThis->m_focusTestingResults);
+				if (success)
+				{
+					pThis->m_DrawFocusTestResults = true;
+				}
+				else
+				{
+					pThis->m_DrawFocusTestResults = false;
+				}
+				pThis->m_FocusImageReadyEvent.ResetEvent();
+				pThis->m_ActiveTestRunning = false;
+			}
+		}
+		pThis->m_matlabTestCode.Shutdown();
+	}
 	return 0;
 }
 
@@ -348,9 +403,6 @@ UINT __cdecl COperatorConsole3View::ThreadProc(LPVOID pParam)
 	COperatorConsole3View* pThis = (COperatorConsole3View*)pParam;
 	pThis->m_ThreadRunning = true;
 	HRESULT hr = ::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
-	mclmcrInitialize();
-	mclInitializeApplication(NULL, 0);
-	pThis->m_matlabTestCode.Initialize();
 	DWORD dwFrameTime = 1000 / 13; // 66 ms
 	LARGE_INTEGER Frequency;
 	QueryPerformanceFrequency(&Frequency);
@@ -488,6 +540,33 @@ void COperatorConsole3View::SaveImage16ToFile(const wchar_t *pathname)
 			}
 		}
 	}
+}
+
+bool COperatorConsole3View::LoadImage8ToFile(const char* filename)
+{
+	bool success = false;
+	// The file... We open it with it's constructor
+	std::ifstream file(filename, std::ios::binary);
+	if (file)
+	{
+		BITMAPFILEHEADER bmpFileHeader;
+		size_t sizeBitmapInfo = sizeof(BITMAPINFOHEADER) + (256 * sizeof(RGBQUAD));
+		m_pBitmapInfoSaved = (BITMAPINFO*)new uint8_t[sizeBitmapInfo];
+		file.read((char*)&bmpFileHeader, sizeof(BITMAPFILEHEADER));
+		file.read((char*)m_pBitmapInfoSaved, sizeBitmapInfo);
+		auto width = m_pBitmapInfoSaved->bmiHeader.biWidth;
+		auto height = m_pBitmapInfoSaved->bmiHeader.biHeight;
+		if (height < 0)
+			height = -height;
+		m_savedImageData.resize(width * height);
+		file.read((char*)&m_savedImageData[0], width * height);
+		success = true;
+	}
+	else
+	{
+		std::cout << "Failure to open bitmap file.\n";
+	}
+	return success;
 }
 
 void COperatorConsole3View::SaveImage8ToFile(const char* filename)

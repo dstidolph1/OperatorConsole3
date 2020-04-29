@@ -45,9 +45,11 @@ public:
 	virtual void OnDraw(CDC* pDC);  // overridden to draw this view
 	virtual BOOL PreCreateWindow(CREATESTRUCT& cs);
 protected:
+	void DisplayFocusResult(CDC *pDC, int x, int y, int value);
 	CStringW UTF8toUTF16(const CStringA& utf8);
 	void DrawRegistrationPoint(CDC* pDC, int x, int y);
 	void InitPictureData();
+	bool LoadImage8ToFile(const char* filename);
 	void SaveImage8ToFile(const char* filename);
 	void SaveImage16ToFile(const wchar_t* filename);
 	virtual void OnInitialUpdate(); // called first time after construct
@@ -72,6 +74,8 @@ protected:
 	Lock m_pictureLock;
 	VideoCapture m_vidCapture;
 	BITMAPINFO* m_pBitmapInfo;
+	BITMAPINFO* m_pBitmapInfoSaved;
+	std::vector<uint8_t> m_savedImageData;
 	DWORD m_sizeBitmapInfo;
 	bool m_OperatorConsoleLockEngaged;
 	bool m_OperatorConsoleSwitchPressed;
@@ -91,8 +95,11 @@ protected:
 	bool m_shrinkDisplay;
 	bool m_magnifyDisplay;
 	bool m_DrawRegistrationMarks;
+	bool m_DrawFocusTestResults;
 	bool m_ActiveTestRunning;
 	bool m_RunFocusTest;
+	CEvent m_ShutdownEvent;
+	CEvent m_FocusImageReadyEvent;
 	uint8_t m_maxPixelValueInSquare;
 	CString m_PictureSavingFolder;
 	CString m_PictureBaseName;
@@ -101,6 +108,8 @@ protected:
 	OperatorConsoleState m_programState;
 	MatlabTestCode m_matlabTestCode;
 	std::vector<CPoint> registrationCoordinates;
+	std::vector<int> m_focusTestingResults;
+	CameraInfoParser m_CameraInfo;
 
 // Generated message map functions
 protected:
