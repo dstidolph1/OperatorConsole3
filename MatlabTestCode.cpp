@@ -14,7 +14,6 @@ MatlabTestCode::~MatlabTestCode()
 bool MatlabTestCode::Initialize()
 {
 	bool success = false;
-	int ret = 0;
 	try {
 		auto mode = mc::MATLABApplicationMode::IN_PROCESS;
 		std::vector<std::u16string> opts = { u"-logfile",
@@ -68,7 +67,6 @@ bool MatlabTestCode::RunTestFullChartMTF50(std::vector<uint16_t>& image, int wid
 		std::vector<matlab::data::Array> output = m_matlabLibrary->feval("fullChartMTF50", 1, params);
 		for (auto outputElement : output)
 		{
-			md::ArrayType type = outputElement.getType();
 			size_t numElements = outputElement.getNumberOfElements();
 			outputData.reserve(numElements + outputData.capacity());
 			for (auto nElement = 0; nElement < numElements; nElement++)
@@ -133,7 +131,6 @@ bool MatlabTestCode::RunTestFullChartSNR(std::vector<uint16_t>& image, int width
 		md::TypedArray<uint16_t> imageArray = factory.createArrayFromBuffer<uint16_t>({ imageHeight, imageWidth }, std::move(imageData), md::MemoryLayout::ROW_MAJOR);
 		std::vector<md::Array>params{ imageArray };
 		auto output = m_matlabLibrary->feval("fullChartSNR", 1, params);
-		size_t numVectorOutput = output.size();
 		outputData.clear();
 		for (auto outputElement : output)
 		{

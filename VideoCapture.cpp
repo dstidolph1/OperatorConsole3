@@ -102,6 +102,30 @@ HRESULT VideoCapture::GetCameraFrame(long &sizeBuffer, long *buffer)
     if (sgGetSampleGrabber())
     {
         captureResult = sgGetSampleGrabber()->GetCurrentBuffer(&sizeBuffer, buffer);
+		switch (captureResult)
+		{
+		case VFW_E_NOT_CONNECTED:
+			OutputDebugStringA("VFW_E_NOT_CONNECTED\n");
+			break;
+		case VFW_E_WRONG_STATE:
+			OutputDebugStringA("VFW_E_WRONG_STATE\n");
+			break;
+		case E_INVALIDARG:
+			OutputDebugStringA("E_INVALIDARG\n");
+			break;
+		case E_OUTOFMEMORY:
+			OutputDebugStringA("E_OUTOFMEMORY\n");
+			break;
+		case E_POINTER:
+			OutputDebugStringA("E_POINTER\n");
+			break;
+		case S_OK:
+			OutputDebugStringA("S_OK\n");
+			break;
+		default:
+			OutputDebugStringA("default\n");
+			break;
+		}
     }
     return captureResult;
 }
@@ -109,11 +133,11 @@ HRESULT VideoCapture::GetCameraFrame(long &sizeBuffer, long *buffer)
 HRESULT VideoCapture::GetCameraFrame(std::vector<uint8_t>& image8Data, std::vector<uint16_t> &image10Data, CRect &rcMaxValue, uint8_t& maxPixelValue)
 {
 	HRESULT hr = E_FAIL;
-	size_t length = gWidth * gHeight;
-	long size16Buffer = gWidth * gHeight * long(sizeof(uint16_t));
+	size_t length = size_t(gWidth) * size_t(gHeight);
+	long size16Buffer = long(length) * long(sizeof(uint16_t));
 	if (0 == image10Data.size())
 	{
-		image10Data.resize(gWidth * gHeight);
+		image10Data.resize(length);
 	}
 	hr = GetCameraFrame(size16Buffer, (long*)&image10Data[0]);
 	maxPixelValue = 0;
@@ -258,7 +282,8 @@ HRESULT VideoCapture::IrledFlashMode(unsigned int IrLedCtrlType)
 
 
 
-VideoCapture::VideoCapture()
+VideoCapture::VideoCapture() : m_pCameraControl(nullptr), m_pVideoProcAmp(nullptr),
+	pmtConfig(nullptr)
 {
 	m_pGrabber = nullptr;
 	m_pGrabberSettings = nullptr;
@@ -279,14 +304,28 @@ VideoCapture::VideoCapture()
 }
 
 
-HRESULT VideoCapture::InitCOM(){
-
+HRESULT VideoCapture::InitCOM()
+{
 	HRESULT nResult = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
 	if (FAILED(nResult))
 	{
 		fprintf(stderr, "ERROR: Unable to initialize the COM library on this Threasd..\n");
 	}
-    return nResult;
+	TCHAR szBuffer[1024] = TEXT("ERROR: Couldn't Find the device eyeLock");  // Large buffer for long filenames or URLs
+	//hr = FindCaptureDevice(0, L"eyeLock's_ov5640_V2.0_RAW", &g_pSrcFilter);
+	//if(hr) hr = FindCaptureDevice(0, L"EyeLock_Iris_Biometric_System", &g_pSrcFilter);
+	HRESULT hr = FindCaptureDevice(0, TEXT("EyeLock_Iris_Biometric_System"), &g_pSrcFilter);
+	// hr = FindCaptureDevice(0, L"eyeLock's cx3 with ov5640 Ver-1.1", &g_pSrcFilter);
+	if (hr < 0) {
+		printf("ERROR: Couldn't Find the device EyeLock %x\n", hr);
+		MessageBox(NULL, szBuffer, TEXT("ERROR: Couldn't Find the device EyeLock"), MB_OK | MB_ICONERROR);
+		exit(0);
+	}
+	else {
+		printf("Found the Capture device\n");
+	}
+	hr = GetInterfaces();
+	return hr;
 }
 
 IPin* VideoCapture::GetPin(IBaseFilter *pFilter, PIN_DIRECTION PinDir)
@@ -554,21 +593,22 @@ HRESULT VideoCapture::sgAddSampleGrabber(IGraphBuilder *pGraph)
 
 HRESULT VideoCapture::sgGetSampleGrabberMediaType(ISampleGrabber * pGrab)
 {
-        AM_MEDIA_TYPE mt;
-        HRESULT hr = pGrab->GetConnectedMediaType(&mt);
-        if (FAILED(hr)) {
-                return hr;
-        }
+	AM_MEDIA_TYPE mt = { 0 };
+    HRESULT hr = pGrab->GetConnectedMediaType(&mt);
+    if (FAILED(hr))
+	{
+		return hr;
+    }
 
-        VIDEOINFOHEADER *pVih = (VIDEOINFOHEADER *)mt.pbFormat;
-        gWidth = pVih->bmiHeader.biWidth;
-        gHeight = pVih->bmiHeader.biHeight;
+    VIDEOINFOHEADER *pVih = (VIDEOINFOHEADER *)mt.pbFormat;
+    gWidth = pVih->bmiHeader.biWidth;
+    gHeight = pVih->bmiHeader.biHeight;
 
-		printf("gWidth....%d\n", gWidth);
-		printf("gHeight....%d\n", gHeight);
+	printf("gWidth....%d\n", gWidth);
+	printf("gHeight....%d\n", gHeight);
 
-        sgFreeMediaType(mt);
-        return hr;
+    sgFreeMediaType(mt);
+    return hr;
 }
 
 
@@ -706,7 +746,7 @@ HRESULT VideoCapture::vcCaptureVideo()
                // return hr;
         //}
 
-
+#if 0
         // Add Capture filter to our graph.
         hr = pGraphBuilder->AddFilter(pSrcFilter, L"Video Capture");
         if (FAILED(hr)) {
@@ -717,6 +757,7 @@ HRESULT VideoCapture::vcCaptureVideo()
                 pSrcFilter->Release();
                 return hr;
         }
+#endif
 
         hr = sgAddSampleGrabber(pGraphBuilder);
         if (FAILED(hr)) {
@@ -805,9 +846,10 @@ HRESULT VideoCapture::RestartVideoCapture()
 	return hr;
 }
 
-HRESULT VideoCapture::StartVideoCapture(){
-
+HRESULT VideoCapture::StartVideoCapture()
+{
 	HRESULT hr; 	
+#if 1
 	TCHAR szBuffer[1024] = TEXT("ERROR: Couldn't Find the device eyeLock");  // Large buffer for long filenames or URLs
 	//hr = FindCaptureDevice(0, L"eyeLock's_ov5640_V2.0_RAW", &g_pSrcFilter);
 	//if(hr) hr = FindCaptureDevice(0, L"EyeLock_Iris_Biometric_System", &g_pSrcFilter);
@@ -821,10 +863,13 @@ HRESULT VideoCapture::StartVideoCapture(){
 		printf("Found the Capture device\n");
 	}
 	// Find Interfaces
-	CoCreateInstance(CLSID_FilterGraph, NULL, CLSCTX_INPROC, IID_IGraphBuilder, (LPVOID *)&pGraphBuilder);
-    CoCreateInstance(CLSID_CaptureGraphBuilder2, NULL, CLSCTX_INPROC, IID_ICaptureGraphBuilder2, (LPVOID *)&pCaptureGraphBuilder2);
-    hr = CoInitialize(0);    
-	hr = pCaptureGraphBuilder2->FindInterface(&PIN_CATEGORY_CAPTURE, 0, g_pSrcFilter, IID_IAMStreamConfig, (void**)&pConfig);
+	if (!pGraphBuilder)
+		hr = CoCreateInstance(CLSID_FilterGraph, NULL, CLSCTX_INPROC, IID_IGraphBuilder, (LPVOID *)&pGraphBuilder);
+	if (!pCaptureGraphBuilder2)
+		hr = CoCreateInstance(CLSID_CaptureGraphBuilder2, NULL, CLSCTX_INPROC, IID_ICaptureGraphBuilder2, (LPVOID *)&pCaptureGraphBuilder2);
+    //hr = CoInitialize(0);    
+	if (!pConfig)
+		hr = pCaptureGraphBuilder2->FindInterface(&PIN_CATEGORY_CAPTURE, 0, g_pSrcFilter, IID_IAMStreamConfig, (void**)&pConfig);
     int iCount = 0, iSize = 0;	
 	hr = pConfig->GetNumberOfCapabilities(&iCount, &iSize);
 	printf("*iCount: %d\n", iCount);
@@ -882,14 +927,15 @@ HRESULT VideoCapture::StartVideoCapture(){
        }
            
     // set grabber properties
-	hr = CoCreateInstance(CLSID_SampleGrabber, NULL, CLSCTX_INPROC_SERVER, IID_IBaseFilter, (void**)&m_pGrabber); // create ISampleGrabber     
-    pCaptureGraphBuilder2->SetFiltergraph(pGraphBuilder); // set FilterGrap
-	pGraphBuilder->QueryInterface(IID_IMediaControl, (LPVOID *)&pMediaControl); // get MediaControl interface
-    m_pGrabber->QueryInterface(IID_ISampleGrabber, (void**)&m_pGrabberSettings);
+	if (!m_pGrabber)
+		hr = CoCreateInstance(CLSID_SampleGrabber, NULL, CLSCTX_INPROC_SERVER, IID_IBaseFilter, (void**)&m_pGrabber); // create ISampleGrabber     
+	if (!pGraphBuilder)
+		hr = pCaptureGraphBuilder2->SetFiltergraph(pGraphBuilder); // set FilterGrap
+	if (!pMediaControl)
+		hr = pGraphBuilder->QueryInterface(IID_IMediaControl, (LPVOID *)&pMediaControl); // get MediaControl interface
+	if (!m_pGrabberSettings)
+		hr = m_pGrabber->QueryInterface(IID_ISampleGrabber, (void**)&m_pGrabberSettings);
 	 
-
-
-
 	// Set the Media Type
 	sgSetSampleGrabberMediaType(m_pGrabberSettings); 
 
@@ -898,23 +944,29 @@ HRESULT VideoCapture::StartVideoCapture(){
     pGraphBuilder->AddFilter(m_pGrabber, L"Sample Grabber");
 
 
+	if (!m_pCameraControl)
+	{
+		hr = g_pSrcFilter->QueryInterface(IID_IAMCameraControl, reinterpret_cast<void**>(&m_pCameraControl));
+		if (FAILED(hr))
+			Msg(TEXT("Failed to get IID_IAMCameraControl!  hr=0x%x"), hr);
+	}
 
-		hr = g_pSrcFilter->QueryInterface(IID_IAMCameraControl, reinterpret_cast<void **>(&m_pCameraControl));
-        if (FAILED(hr)) Msg(TEXT("Failed to get IID_IAMCameraControl!  hr=0x%x"), hr);
-       
-
-		hr = g_pSrcFilter->QueryInterface(IID_IAMVideoProcAmp, reinterpret_cast<void **>(&m_pVideoProcAmp));
-        if (FAILED(hr)) Msg(TEXT("Failed to get IID_IAMVideoProcAmp!  hr=0x%x"), hr);
-
+	if (!m_pVideoProcAmp)
+	{
+		hr = g_pSrcFilter->QueryInterface(IID_IAMVideoProcAmp, reinterpret_cast<void**>(&m_pVideoProcAmp));
+		if (FAILED(hr))
+			Msg(TEXT("Failed to get IID_IAMVideoProcAmp!  hr=0x%x"), hr);
+	}
 	IPin* pSourceOut_0 = GetPin(g_pSrcFilter, PINDIR_OUTPUT);
     IPin* pGrabberIn_0 = GetPin(m_pGrabber, PINDIR_INPUT);
-	pGraphBuilder->Connect(pSourceOut_0, pGrabberIn_0);
+	hr = pGraphBuilder->Connect(pSourceOut_0, pGrabberIn_0);
 
+#endif
 	// wrong place for this call????
-	sgGetSampleGrabberMediaType(m_pGrabberSettings); 
+	//hr = sgGetSampleGrabberMediaType(m_pGrabberSettings); 
 	     
 	// start playing
-    pMediaControl->Run();	
+    hr = pMediaControl->Run();	
 	
 	return hr;
 }
