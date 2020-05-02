@@ -30,7 +30,7 @@ using namespace Gdiplus;
 
 // Global declaration
 
-#define USE_SOFTWARE_FOR_STATION
+//#define USE_SOFTWARE_FOR_STATION
 #define NUM_AVERAGE_IMAGES 10
 
 using _com_util::CheckError;
@@ -382,7 +382,7 @@ bool COperatorConsole3View::SwitchPressed()
 
 OperatorConsoleState COperatorConsole3View::HandleWaitForCameraLock(bool newState)
 {
-	if (m_OperatorConsoleLockEngaged)
+	if (MagLockEngaged())
 	{
 		return eStateFocusingCamera;
 	}
@@ -398,7 +398,7 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 		PostMessage(MSG_SET_CAMERA_INFO, 0, reinterpret_cast<LPARAM>(&m_CameraInfo));
 	}
 	CRect rcWhiteSquare(1188,582,1317,733);
-	if (m_OperatorConsoleLockEngaged)
+	if (MagLockEngaged())
 	{
 		if (m_CameraRunning)
 		{
@@ -453,7 +453,7 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 					}
 				}
 			}
-			if (m_OperatorConsoleSwitchPressed)
+			if (SwitchPressed())
 				return eStateTestingCamera;
 			return eStateFocusingCamera;
 		}
@@ -482,7 +482,7 @@ OperatorConsoleState COperatorConsole3View::HandleTestingCamera(bool newState)
 	static bool makingAverage = true;
 	static int imageCount = 0;
 	m_bRunTestQuickMTF50 = false;
-	if (m_OperatorConsoleLockEngaged)
+	if (MagLockEngaged())
 	{
 		bool frameValid = GetFrame(m_image8Data, m_image16Data);
 		if (newState)
@@ -521,7 +521,7 @@ OperatorConsoleState COperatorConsole3View::HandleTestingCamera(bool newState)
 
 OperatorConsoleState COperatorConsole3View::HandleReportResults(bool newState)
 {
-	if (m_OperatorConsoleLockEngaged)
+	if (MagLockEngaged())
 	{
 		return eStateReportResults;
 	}
@@ -670,7 +670,7 @@ UINT __cdecl COperatorConsole3View::ThreadProc(LPVOID pParam)
 			}
 
 		}
-		if (pThis->m_ThreadShutdown || (!pThis->m_OperatorConsoleLockEngaged && pThis->m_CameraRunning))
+		if (pThis->m_ThreadShutdown || (!pThis->MagLockEngaged() && pThis->m_CameraRunning))
 		{
 			pThis->m_vidCapture.vcStopCaptureVideo();
 			pThis->m_CameraRunning = false;
