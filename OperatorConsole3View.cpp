@@ -30,6 +30,9 @@ using namespace Gdiplus;
 
 // Global declaration
 
+#define USE_SOFTWARE_FOR_STATION
+#define NUM_AVERAGE_IMAGES 10
+
 using _com_util::CheckError;
 using container = std::vector<std::vector<bool>>;
 
@@ -76,7 +79,10 @@ COperatorConsole3View::COperatorConsole3View() noexcept :
 	m_zoomMultiplier(1), m_shrinkDisplay(false), m_magnifyDisplay(false),
 	m_width(PICTURE_WIDTH),	m_height(PICTURE_HEIGHT), m_maxPixelValueInSquare(0), m_FrameNumber(0),
 	m_MaxSaveFrames(10), m_RunFocusTest(false), m_pBitmapInfoSaved(nullptr), m_ShutdownEvent(FALSE, TRUE, NULL, NULL),
-	m_FocusImageReadyEvent(FALSE, TRUE, NULL, NULL), m_DrawFocusTestResults(false)
+	m_MatlabImageTestReadyEvent(FALSE, TRUE, NULL, NULL), m_DrawFocusTestResults(false), m_bMagStripeEngaged(false),
+	m_bCX3ButonPressed(false), m_bRunTestQuickMTF50(false), m_bRunTestFullChartMTF50(false), m_bRunTestFullChartSNR(false),
+	m_DrawFullChartMTF50(false), m_DrawFullChartSNR(false)
+
 {
 	// TODO: add construction code here
 	::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
@@ -105,7 +111,7 @@ BOOL COperatorConsole3View::PreCreateWindow(CREATESTRUCT& cs)
 	return CScrollView::PreCreateWindow(cs);
 }
 
-void COperatorConsole3View::DisplayFocusResult(CDC* pDC, int x, int y, int value)
+void COperatorConsole3View::DisplayFocusResult(CDC* pDC, int x, int y, double value)
 {
 	CString sValue(std::to_string(value).c_str());
 	pDC->TextOut(x, y, sValue);
@@ -169,12 +175,78 @@ void COperatorConsole3View::OnDraw(CDC* pDC)
 	}
 	if (m_DrawFocusTestResults)
 	{
-		DisplayFocusResult(pDC, 1201, 515, m_focusTestingResults[0]);
-		DisplayFocusResult(pDC, 815,  880, m_focusTestingResults[1]);
-		DisplayFocusResult(pDC, 1205, 1145, m_focusTestingResults[2]);
-		DisplayFocusResult(pDC, 1700, 950, m_focusTestingResults[3]);
-		DisplayFocusResult(pDC, 1180, 1450, m_focusTestingResults[4]);
+		if (m_shrinkDisplay)
+		{
+			DisplayFocusResult(pDC, 1201 / m_zoomDivision, 515 / m_zoomDivision, m_outputQuickMTF50[0].mtf50);
+			DisplayFocusResult(pDC, 815 / m_zoomDivision, 880 / m_zoomDivision, m_outputQuickMTF50[1].mtf50);
+			DisplayFocusResult(pDC, 1205 / m_zoomDivision, 1145 / m_zoomDivision, m_outputQuickMTF50[2].mtf50);
+			DisplayFocusResult(pDC, 1700 / m_zoomDivision, 950 / m_zoomDivision, m_outputQuickMTF50[3].mtf50);
+			DisplayFocusResult(pDC, 1180 / m_zoomDivision, 1450 / m_zoomDivision, m_outputQuickMTF50[4].mtf50);
+		}
+		else if (m_magnifyDisplay)
+		{
+			DisplayFocusResult(pDC, 1201 * m_zoomMultiplier, 515 * m_zoomMultiplier, m_outputQuickMTF50[0].mtf50);
+			DisplayFocusResult(pDC, 815 * m_zoomMultiplier, 880 * m_zoomMultiplier, m_outputQuickMTF50[1].mtf50);
+			DisplayFocusResult(pDC, 1205 * m_zoomMultiplier, 1145 * m_zoomMultiplier, m_outputQuickMTF50[2].mtf50);
+			DisplayFocusResult(pDC, 1700 * m_zoomMultiplier, 950 * m_zoomMultiplier, m_outputQuickMTF50[3].mtf50);
+			DisplayFocusResult(pDC, 1180 * m_zoomMultiplier, 1450 * m_zoomMultiplier, m_outputQuickMTF50[4].mtf50);
+		}
+		else
+		{
+			DisplayFocusResult(pDC, 1201, 515, m_outputQuickMTF50[0].mtf50);
+			DisplayFocusResult(pDC, 815, 880, m_outputQuickMTF50[1].mtf50);
+			DisplayFocusResult(pDC, 1205, 1145, m_outputQuickMTF50[2].mtf50);
+			DisplayFocusResult(pDC, 1700, 950, m_outputQuickMTF50[3].mtf50);
+			DisplayFocusResult(pDC, 1180, 1450, m_outputQuickMTF50[4].mtf50);
+		}
 	}
+	else if (m_DrawFullChartMTF50)
+	{
+		for (auto i = m_outputFullChartMTF50.begin(); i != m_outputFullChartMTF50.end(); i++)
+		{
+			DisplayFocusResult(pDC, i->x, i->y, i->mtf50);
+		}
+	}
+	else if (m_DrawFullChartSNR)
+	{
+		size_t index = 0;
+		for (auto i = m_outputFullChartSNR.begin(); i != m_outputFullChartSNR.end(); i++)
+		{
+			if (index < m_GreyBoxes.size())
+			{
+				int x = m_GreyBoxes[index].x;
+				int y = m_GreyBoxes[index].y;
+				DisplayFocusResult(pDC, x, y, double(index));
+				DisplayFocusResult(pDC, x, y + 10, i->meanIntensity);
+				DisplayFocusResult(pDC, x, y + 20, i->RMSNoise);
+				DisplayFocusResult(pDC, x, y + 30, i->SignalToNoise);
+				index++;
+			}
+		}
+	}
+}
+
+bool COperatorConsole3View::OpenCSV(CFile& file, CString filename, CString headers)
+{
+	bool success = false;
+	if (PathFileExists(filename.GetString()))
+	{
+		if (file.Open(filename, CFile::typeText | CFile::modeCreate | CFile::modeNoTruncate | CFile::modeWrite))
+		{
+			file.SeekToEnd();
+			success = true;
+		}
+	}
+	else // File does NOT exist, so we have to open and write headers
+	{
+		if (file.Open(filename, CFile::typeText | CFile::modeCreate | CFile::modeNoTruncate | CFile::modeWrite))
+		{
+			file.Write(headers, headers.GetLength());
+			file.Write("\n", 1);
+			success = true;
+		}
+	}
+	return success;
 }
 
 void COperatorConsole3View::InitPictureData()
@@ -238,6 +310,26 @@ void COperatorConsole3View::OnInitialUpdate()
 	m_FrameNumber = 0;
 	m_MaxSaveFrames = 10;
 	LoadImage8ToFile(".\\CenteredImageAt150.bmp");
+	m_GreyBoxes.push_back(CPoint(1353, 1334)); //1
+	m_GreyBoxes.push_back(CPoint(1249, 1334)); //2
+	m_GreyBoxes.push_back(CPoint(1454, 1310)); //3
+	m_GreyBoxes.push_back(CPoint(1142, 1312)); //4
+	m_GreyBoxes.push_back(CPoint(1559, 1253)); //5
+	m_GreyBoxes.push_back(CPoint(1040, 1254)); //6
+	m_GreyBoxes.push_back(CPoint(1615, 1152)); //7
+	m_GreyBoxes.push_back(CPoint(996, 1150)); //8
+	m_GreyBoxes.push_back(CPoint(1640, 945)); //9
+	m_GreyBoxes.push_back(CPoint(957, 1047)); //10
+	m_GreyBoxes.push_back(CPoint(1640, 945)); //11
+	m_GreyBoxes.push_back(CPoint(957, 944)); //12
+	m_GreyBoxes.push_back(CPoint(1616, 836)); //13
+	m_GreyBoxes.push_back(CPoint(997, 838)); //14
+	m_GreyBoxes.push_back(CPoint(1559, 734)); //15
+	m_GreyBoxes.push_back(CPoint(1041, 733)); //16
+	m_GreyBoxes.push_back(CPoint(1458, 677)); //17
+	m_GreyBoxes.push_back(CPoint(1147, 675)); //18
+	m_GreyBoxes.push_back(CPoint(1353, 652)); //19
+	m_GreyBoxes.push_back(CPoint(1250, 651)); //20
 	HRESULT hr = m_vidCapture.InitCOM();
 	if (SUCCEEDED(hr))
 	{
@@ -250,6 +342,43 @@ void COperatorConsole3View::OnInitialUpdate()
 	}
 
 }
+
+#define VENDER_CMD_NONE 21
+#define VENDER_CMD_POLL_MAG_STATUS 22
+#define VENDER_CMD_POLL_BUTTON_STATUS 23
+
+bool COperatorConsole3View::MagLockEngaged()
+{
+#if defined(USE_SOFTWARE_FOR_STATION)
+	return m_bMagStripeEngaged;
+#else
+	long value = -1, flags = 0;
+	HRESULT hr = m_vidCapture.CameraControl()->Get(CameraControl_Focus, &value, &flags);
+	hr = m_vidCapture.CameraControl()->Set(CameraControl_Focus, VENDER_CMD_POLL_MAG_STATUS, flags);
+	hr = m_vidCapture.VideoProcAmp()->Get(VideoProcAmp_Hue, &value, &flags);
+	bool magLockEngaged = (0 == value);
+	hr = m_vidCapture.CameraControl()->Get(CameraControl_Focus, &value, &flags);
+	hr = m_vidCapture.CameraControl()->Set(CameraControl_Focus, VENDER_CMD_NONE, flags);
+	return magLockEngaged;
+#endif
+}
+
+bool COperatorConsole3View::SwitchPressed()
+{
+#if defined(USE_SOFTWARE_FOR_STATION)
+	return m_bCX3ButonPressed;
+#else
+	long value = -1, flags = 0;
+	HRESULT hr = m_vidCapture.CameraControl()->Get(CameraControl_Focus, &value, &flags);
+	hr = m_vidCapture.CameraControl()->Set(CameraControl_Focus, VENDER_CMD_POLL_BUTTON_STATUS, flags);
+	hr = m_vidCapture.VideoProcAmp()->Get(VideoProcAmp_Hue, &value, &flags);
+	bool switchPressed = (1 == value);
+	hr = m_vidCapture.CameraControl()->Get(CameraControl_Focus, &value, &flags);
+	hr = m_vidCapture.CameraControl()->Set(CameraControl_Focus, VENDER_CMD_NONE, flags);
+	return switchPressed;
+#endif
+}
+
 
 OperatorConsoleState COperatorConsole3View::HandleWaitForCameraLock(bool newState)
 {
@@ -273,58 +402,55 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 	{
 		if (m_CameraRunning)
 		{
-
+			if (GetFrame(m_image8Data, m_image16Data))
 			{
-				WriteLock lock(m_pictureLock);
-				m_vidCapture.GetCameraFrame(m_image8Data, m_image16Data, rcWhiteSquare, m_maxPixelValueInSquare); // This will load the bitmap with the current frame
-				m_FrameNumber++;
-			}
-			if (m_maxPixelValueInSquare > 0)
-			{
-				ReadLock lock(m_pictureLock);
-				CDC* pDC = GetDC();
-				OnDraw(pDC);
-				ReleaseDC(pDC);
-				if (!m_ActiveTestRunning && m_RunFocusTest)
+				if (m_maxPixelValueInSquare > 0)
 				{
-					m_ActiveTestRunning = true;
-					memcpy(&m_image8DataTesting[0], &m_image8Data[0], m_image8Data.size()); // Copy to backup which will be tested
-					//memcpy(&m_image8DataTesting[0], &m_savedImageData[0], m_savedImageData.size()); // Copy to backup which will be tested
-					m_FocusImageReadyEvent.SetEvent();
+					ReadLock lock(m_pictureLock);
+					CDC* pDC = GetDC();
+					OnDraw(pDC);
+					ReleaseDC(pDC);
+					if (!m_ActiveTestRunning && m_RunFocusTest)
+					{
+						m_ActiveTestRunning = true;
+						//memcpy(&m_image8DataTesting[0], &m_image8Data[0], m_image8Data.size()); // Copy to backup which will be tested
+						memcpy(&m_image8DataTesting[0], &m_savedImageData[0], m_savedImageData.size()); // Copy to backup which will be tested
+						m_MatlabImageTestReadyEvent.SetEvent();
+					}
 				}
-			}
-			if (m_SaveEveryFrame8 && (m_SaveFrameCount < m_MaxSaveFrames))
-			{
-				WriteLock lock(m_pictureLock);
-				CString filename;
-				filename.Format("%s\\%sFrame-%04d.bmp", m_PictureSavingFolder.GetBuffer(), m_PictureBaseName.GetBuffer(), m_FrameNumber);
-				SaveImage8ToFile(filename);
-				m_SaveFrameCount++;
-				if (m_SaveFrameCount >= m_MaxSaveFrames)
+				if (m_SaveEveryFrame8 && (m_SaveFrameCount < m_MaxSaveFrames))
 				{
-					m_SaveEveryFrame8 = false;
-					CMenu* pMenu = GetParentMenu();
-					if (pMenu)
-						pMenu->CheckMenuItem(ID_CAMERA_SAVESEQUENCETODISK, MF_UNCHECKED | MF_BYCOMMAND);
+					WriteLock lock(m_pictureLock);
+					CString filename;
+					filename.Format("%s\\%sFrame-%04d.bmp", m_PictureSavingFolder.GetBuffer(), m_PictureBaseName.GetBuffer(), m_FrameNumber);
+					SaveImage8ToFile(filename);
+					m_SaveFrameCount++;
+					if (m_SaveFrameCount >= m_MaxSaveFrames)
+					{
+						m_SaveEveryFrame8 = false;
+						CMenu* pMenu = GetParentMenu();
+						if (pMenu)
+							pMenu->CheckMenuItem(ID_CAMERA_SAVESEQUENCETODISK, MF_UNCHECKED | MF_BYCOMMAND);
 
+					}
 				}
-			}
-			if (m_SaveEveryFrame16 && (m_SaveFrameCount < m_MaxSaveFrames))
-			{
-				WriteLock lock(m_pictureLock);
-				CStringW filename;
-				CStringW folder = UTF8toUTF16(m_PictureSavingFolder);
-				CStringW baseName = UTF8toUTF16(m_PictureBaseName);
-				filename.Format(L"%s\\%sFrame-%04d.tif", folder.GetBuffer(), baseName.GetBuffer(), m_FrameNumber);
-				SaveImage16ToFile(filename);
-				m_SaveFrameCount++;
-				if (m_SaveFrameCount >= m_MaxSaveFrames)
+				if (m_SaveEveryFrame16 && (m_SaveFrameCount < m_MaxSaveFrames))
 				{
-					m_SaveEveryFrame16 = false;
-					CMenu* pMenu = GetParentMenu();
-					if (pMenu)
-						pMenu->CheckMenuItem(ID_CAMERA_SAVESEQUENCETODISK, MF_UNCHECKED | MF_BYCOMMAND);
+					WriteLock lock(m_pictureLock);
+					CStringW filename;
+					CStringW folder = UTF8toUTF16(m_PictureSavingFolder);
+					CStringW baseName = UTF8toUTF16(m_PictureBaseName);
+					filename.Format(L"%s\\%sFrame-%04d.tif", folder.GetBuffer(), baseName.GetBuffer(), m_FrameNumber);
+					SaveImage16ToFile(filename);
+					m_SaveFrameCount++;
+					if (m_SaveFrameCount >= m_MaxSaveFrames)
+					{
+						m_SaveEveryFrame16 = false;
+						CMenu* pMenu = GetParentMenu();
+						if (pMenu)
+							pMenu->CheckMenuItem(ID_CAMERA_SAVESEQUENCETODISK, MF_UNCHECKED | MF_BYCOMMAND);
 
+					}
 				}
 			}
 			if (m_OperatorConsoleSwitchPressed)
@@ -338,10 +464,54 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 		return eStateWaitForCameraLock;
 }
 
+bool COperatorConsole3View::GetFrame(std::vector<uint8_t>& image8Data, std::vector<uint16_t>& image16Data)
+{
+	bool success = false;
+	CRect rcWhiteSquare(1188, 582, 1317, 733);
+	{
+		WriteLock lock(m_pictureLock);
+		HRESULT hr = m_vidCapture.GetCameraFrame(m_image8Data, m_image16Data, rcWhiteSquare, m_maxPixelValueInSquare); // This will load the bitmap with the current frame
+		m_FrameNumber++;
+		success = SUCCEEDED(hr);
+	}
+	return success;
+}
+
 OperatorConsoleState COperatorConsole3View::HandleTestingCamera(bool newState)
 {
+	static bool makingAverage = true;
+	static int imageCount = 0;
+	m_bRunTestQuickMTF50 = false;
 	if (m_OperatorConsoleLockEngaged)
 	{
+		bool frameValid = GetFrame(m_image8Data, m_image16Data);
+		if (newState)
+		{
+			makingAverage = true;
+			imageCount = 0;
+			memset(&m_image32Average, 0, sizeof(m_image32Average[0]) * m_image32Average.size());
+			m_image16DataTesting = m_image16Data;
+			m_bRunTestFullChartSNR = true;
+			m_MatlabImageTestReadyEvent.SetEvent(); // go ahead with the first test - just once
+		}
+		if (makingAverage)
+		{
+			for (size_t i = 0; i < m_image16Data.size(); i++)
+			{
+				m_image32Average[i] += m_image16Data[i];
+			}
+			imageCount++;
+			if (imageCount >= NUM_AVERAGE_IMAGES)
+			{
+				makingAverage = false;
+				for (size_t i = 0; i < m_image16Data.size(); i++)
+				{
+					m_image16DataTesting[i] = m_image32Average[i] / imageCount;
+				}
+				m_bRunTestFullChartMTF50 = true;
+				m_MatlabImageTestReadyEvent.SetEvent();
+			}
+		}
 		// do test
 		return eStateTestingCamera;
 	}
@@ -372,7 +542,7 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 		OperatorConsoleState nextState = pThis->m_programState;
 		HANDLE handles[2];
 		handles[0] = pThis->m_ShutdownEvent;
-		handles[1] = pThis->m_FocusImageReadyEvent;
+		handles[1] = pThis->m_MatlabImageTestReadyEvent;
 		while (!pThis->m_ThreadShutdown)
 		{
 			DWORD waitResult = WaitForMultipleObjects(2, handles, FALSE, INFINITE);
@@ -380,16 +550,90 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 			{
 				::QueryPerformanceCounter(&timeStart);
 				pThis->m_ActiveTestRunning = true;
-				bool success = pThis->m_matlabTestCode.RunTestQuickMTF50(pThis->m_image8DataTesting, pThis->m_width, pThis->m_height, pThis->registrationCoordinates, pThis->m_focusTestingResults);
-				if (success)
+				CFile file;
+				if (pThis->m_bRunTestQuickMTF50)
 				{
-					pThis->m_DrawFocusTestResults = true;
+					pThis->m_DrawFocusTestResults = pThis->m_matlabTestCode.RunTestQuickMTF50(pThis->m_image8DataTesting, pThis->m_width, pThis->m_height, pThis->registrationCoordinates, pThis->m_outputQuickMTF50);
+					if (pThis->m_DrawFocusTestResults &&
+						pThis->OpenCSV(file, "FocusTest.csv", "CameraID,FrameNum,MTF50-1,MTF50-2,MTF50-3,MTF50-4,MTF50-5"))
+					{
+						CString sText;
+						sText.Format("%s,%d", pThis->m_CameraID.c_str(), pThis->m_FrameNumber);
+						file.Write(sText.GetString(), sText.GetLength());
+						for (auto i = pThis->m_outputQuickMTF50.begin(); i != pThis->m_outputQuickMTF50.end(); i++)
+						{
+							file.Write(",", 1);
+							std::string text = std::to_string(i->mtf50);
+							file.Write(text.c_str(), text.length());
+						}
+						file.Write("\n", 1);
+					}
 				}
-				else
+				else if (pThis->m_bRunTestFullChartMTF50)
 				{
-					pThis->m_DrawFocusTestResults = false;
+					pThis->m_DrawFullChartMTF50 = pThis->m_matlabTestCode.RunTestFullChartMTF50(pThis->m_image16DataTesting, pThis->m_width, pThis->m_height, pThis->m_outputFullChartMTF50);
+					if (pThis->m_DrawFullChartMTF50)
+					{
+						std::string header = "CameraID,FrameNum";
+						for (size_t i = 0; i < pThis->m_outputFullChartMTF50.size(); i++)
+						{
+							header += ",x-" + std::to_string(i) + ",y-" + std::to_string(i) + ",MFT50-" + std::to_string(i);
+						}
+						if (pThis->OpenCSV(file, "FullChartMTF50.csv", header.c_str()))
+						{
+							CString sText;
+							sText.Format("%s,%d", pThis->m_CameraID.c_str(), pThis->m_FrameNumber);
+							file.Write(sText.GetString(), sText.GetLength());
+							for (auto i = pThis->m_outputFullChartMTF50.begin(); i != pThis->m_outputFullChartMTF50.end(); i++)
+							{
+								std::string text = std::to_string(i->x);
+								file.Write(",", 1);
+								file.Write(text.c_str(), text.length());
+								text = std::to_string(i->y);
+								file.Write(",", 1);
+								file.Write(text.c_str(), text.length());
+								text = std::to_string(i->mtf50);
+								file.Write(",", 1);
+								file.Write(text.c_str(), text.length());
+							}
+							file.Write("\n", 1);
+						}
+					}
 				}
-				pThis->m_FocusImageReadyEvent.ResetEvent();
+				else if (pThis->m_bRunTestFullChartSNR)
+				{
+					pThis->m_DrawFullChartSNR = pThis->m_matlabTestCode.RunTestFullChartSNR(pThis->m_image16DataTesting, pThis->m_width, pThis->m_height, pThis->m_outputFullChartSNR);
+					if (pThis->m_DrawFullChartSNR)
+					{
+						std::string header = "CameraID,FrameNum";
+						for (size_t i = 0; i < pThis->m_outputFullChartSNR.size(); i++)
+						{
+							header += ",MeanIntensity-" + std::to_string(i);
+							header += ",RMSNoise-" + std::to_string(i);
+							header += ",SignalToNoise-" + std::to_string(i);
+						}
+						if (pThis->OpenCSV(file, "FullChartSNR.csv", header.c_str()))
+						{
+							CString sText;
+							sText.Format("%s,%d", pThis->m_CameraID.c_str(), pThis->m_FrameNumber);
+							file.Write(sText.GetString(), sText.GetLength());
+							for (auto i = pThis->m_outputFullChartSNR.begin(); i != pThis->m_outputFullChartSNR.end(); i++)
+							{
+								file.Write(",", 1);
+								std::string text = std::to_string(i->meanIntensity);
+								file.Write(text.c_str(), text.length());
+								file.Write(",", 1);
+								text = std::to_string(i->meanIntensity);
+								file.Write(text.c_str(), text.length());
+								file.Write(",", 1);
+								text = std::to_string(i->meanIntensity);
+								file.Write(text.c_str(), text.length());
+							}
+							file.Write("\n", 1);
+						}
+					}
+				}
+				pThis->m_MatlabImageTestReadyEvent.ResetEvent();
 				pThis->m_ActiveTestRunning = false;
 			}
 		}
@@ -558,8 +802,9 @@ bool COperatorConsole3View::LoadImage8ToFile(const char* filename)
 		auto height = m_pBitmapInfoSaved->bmiHeader.biHeight;
 		if (height < 0)
 			height = -height;
-		m_savedImageData.resize(width * height);
-		file.read((char*)&m_savedImageData[0], width * height);
+		auto imageSize = width * height;
+		m_savedImageData.resize(imageSize);
+		file.read((char*)&m_savedImageData[0], imageSize);
 		success = true;
 	}
 	else
@@ -633,6 +878,7 @@ CMenu* COperatorConsole3View::GetParentMenu()
 void COperatorConsole3View::OnCameraOperatorConsoleLock()
 {
 	m_OperatorConsoleLockEngaged = !m_OperatorConsoleLockEngaged;
+	m_bMagStripeEngaged = m_OperatorConsoleLockEngaged;
 	CMenu* pMenu = GetParentMenu();
 	if (pMenu)
 	{
@@ -643,6 +889,7 @@ void COperatorConsole3View::OnCameraOperatorConsoleLock()
 		else
 		{
 			pMenu->CheckMenuItem(ID_CAMERA_OPERATORCONSOLELOCK, MF_UNCHECKED | MF_BYCOMMAND);
+
 		}
 	}
 }

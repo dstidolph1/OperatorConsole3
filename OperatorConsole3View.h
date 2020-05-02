@@ -44,8 +44,13 @@ public:
 public:
 	virtual void OnDraw(CDC* pDC);  // overridden to draw this view
 	virtual BOOL PreCreateWindow(CREATESTRUCT& cs);
+	bool MagLockEngaged();
+	bool SwitchPressed();
+
 protected:
-	void DisplayFocusResult(CDC *pDC, int x, int y, int value);
+	bool OpenCSV(CFile& file, CString filename, CString headers);
+	bool GetFrame(std::vector<uint8_t>& image8Data, std::vector<uint16_t>& image16Data);
+	void DisplayFocusResult(CDC *pDC, int x, int y, double value);
 	CStringW UTF8toUTF16(const CStringA& utf8);
 	void DrawRegistrationPoint(CDC* pDC, int x, int y);
 	void InitPictureData();
@@ -77,6 +82,7 @@ protected:
 	BITMAPINFO* m_pBitmapInfoSaved;
 	std::vector<uint8_t> m_savedImageData;
 	DWORD m_sizeBitmapInfo;
+	std::string m_CameraID;
 	bool m_OperatorConsoleLockEngaged;
 	bool m_OperatorConsoleSwitchPressed;
 	bool m_DrawingPicture;
@@ -96,20 +102,32 @@ protected:
 	bool m_magnifyDisplay;
 	bool m_DrawRegistrationMarks;
 	bool m_DrawFocusTestResults;
+	bool m_DrawFullChartMTF50;
+	bool m_DrawFullChartSNR;
 	bool m_ActiveTestRunning;
 	bool m_RunFocusTest;
+	bool m_bMagStripeEngaged;
+	bool m_bCX3ButonPressed;
+	bool m_bRunTestQuickMTF50;
+	bool m_bRunTestFullChartMTF50;
+	bool m_bRunTestFullChartSNR;
 	CEvent m_ShutdownEvent;
-	CEvent m_FocusImageReadyEvent;
+	CEvent m_MatlabImageTestReadyEvent;
 	uint8_t m_maxPixelValueInSquare;
 	CString m_PictureSavingFolder;
 	CString m_PictureBaseName;
 	std::vector<uint8_t> m_image8Data, m_image8DataTesting;
-	std::vector<uint16_t> m_image16Data;
+	std::vector<uint16_t> m_image16Data, m_image16DataTesting;
+	std::vector<uint32_t> m_image32Average;
 	OperatorConsoleState m_programState;
 	MatlabTestCode m_matlabTestCode;
 	std::vector<CPoint> registrationCoordinates;
-	std::vector<int> m_focusTestingResults;
 	CameraInfoParser m_CameraInfo;
+	std::vector<CPoint> m_GreyBoxes;
+	// Output variables
+	std::vector<QuickMTF50Data> m_outputQuickMTF50;
+	std::vector<FullChartSNRData> m_outputFullChartSNR;
+	std::vector<FullChartMTF50Data> m_outputFullChartMTF50;
 
 // Generated message map functions
 protected:
