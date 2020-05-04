@@ -11,7 +11,9 @@
 #include <comip.h>
 #include <comutil.h>
 #include <wincodec.h>
+#include "Logging.h"
 #include "MatlabTestCode.h"
+#include <memory>
 
 typedef std::shared_mutex Lock;
 typedef std::unique_lock< Lock >  WriteLock;
@@ -68,6 +70,7 @@ protected:
 	OperatorConsoleState HandleReportResults(bool newState);
 	CMenu* GetParentMenu();
 	void SetStatusBarText(CString text);
+	OperatorConsoleState SetProgramState(OperatorConsoleState state);
 
 // Implementation
 public:
@@ -85,10 +88,15 @@ protected:
 	std::vector<uint8_t> m_savedImageData;
 	DWORD m_sizeBitmapInfo;
 	std::string m_CameraID;
+	Logging::CLoggerFactory m_loggerFactor;
+	std::unique_ptr<Logging::CLogTargetFile> m_logTargetFile;
+	CWinThread* m_pProgramStateThread;
+	CWinThread* m_pTestingThread;
 	bool m_OperatorConsoleLockEngaged;
 	bool m_OperatorConsoleSwitchPressed;
 	bool m_DrawingPicture;
-	bool m_ThreadRunning;
+	bool m_ProgramStateThreadRunning;
+	bool m_TestingThreadRunning;
 	bool m_ThreadShutdown;
 	bool m_CameraRunning;
 	bool m_SaveEveryFrame8;
@@ -125,6 +133,7 @@ protected:
 	std::vector<uint16_t> m_image16Data, m_image16DataTesting;
 	std::vector<uint32_t> m_image32Average;
 	OperatorConsoleState m_programState;
+	bool m_stateChange;
 	MatlabTestCode m_matlabTestCode;
 	std::vector<CPoint> registrationCoordinates;
 	CameraInfoParser m_CameraInfo;

@@ -70,20 +70,20 @@ END_MESSAGE_MAP()
 
 // COperatorConsole3View construction/destruction
 
-COperatorConsole3View::COperatorConsole3View() noexcept : 
+COperatorConsole3View::COperatorConsole3View() noexcept :
 	m_ActiveTestRunning(false), m_SaveFrameCount(0), m_programState(eStateWaitForCameraLock),
 	m_pBitmapInfo(nullptr), m_sizeBitmapInfo(0), m_OperatorConsoleLockEngaged(false),
-	m_OperatorConsoleSwitchPressed(false), m_CameraRunning(false), m_ThreadRunning(false),
+	m_OperatorConsoleSwitchPressed(false), m_CameraRunning(false), m_ProgramStateThreadRunning(false),
 	m_ThreadShutdown(false), m_DrawingPicture(false), m_SaveEveryFrame8(false),
 	m_SaveEveryFrame16(false), m_DrawRegistrationMarks(false), m_zoomDivision(1),
 	m_zoomMultiplier(1), m_shrinkDisplay(false), m_magnifyDisplay(false),
-	m_width(PICTURE_WIDTH),	m_height(PICTURE_HEIGHT), m_maxPixelValueInSquare(0), m_FrameNumber(0),
+	m_width(PICTURE_WIDTH), m_height(PICTURE_HEIGHT), m_maxPixelValueInSquare(0), m_FrameNumber(0),
 	m_MaxSaveFrames(10), m_RunFocusTest(false), m_pBitmapInfoSaved(nullptr), m_ShutdownEvent(FALSE, TRUE, NULL, NULL),
 	m_MatlabImageTestReadyEvent(FALSE, TRUE, NULL, NULL), m_DrawFocusTestResults(false), m_bMagStripeEngaged(false),
 	m_bCX3ButonPressed(false), m_bRunTestQuickMTF50(false), m_bRunTestFullChartMTF50(false), m_bRunTestFullChartSNR(false),
 	m_DrawFullChartMTF50(false), m_DrawFullChartSNR(false), m_bFullChartMTF50Done(false), m_bFullChartSNRDone(false),
-	m_bQuickMTF50Done(false)
-
+	m_bQuickMTF50Done(false), m_stateChange(false), m_TestingThreadRunning(false),
+	m_pProgramStateThread(nullptr), m_pTestingThread(nullptr)
 {
 	// TODO: add construction code here
 	::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
@@ -205,7 +205,7 @@ void COperatorConsole3View::OnDraw(CDC* pDC)
 	{
 		for (auto i = m_outputFullChartMTF50.begin(); i != m_outputFullChartMTF50.end(); i++)
 		{
-			DisplayFocusResult(pDC, i->x, i->y, i->mtf50);
+			DisplayFocusResult(pDC, int(i->x), int(i->y), i->mtf50);
 		}
 	}
 	else if (m_DrawFullChartSNR)
@@ -217,10 +217,10 @@ void COperatorConsole3View::OnDraw(CDC* pDC)
 			{
 				int x = m_GreyBoxes[index].x;
 				int y = m_GreyBoxes[index].y;
-				DisplayFocusResult(pDC, x, y, double(index));
-				DisplayFocusResult(pDC, x, y + 10, i->meanIntensity);
-				DisplayFocusResult(pDC, x, y + 20, i->RMSNoise);
-				DisplayFocusResult(pDC, x, y + 30, i->SignalToNoise);
+				DisplayFocusResult(pDC, int(i->x), int(i->y), double(index));
+				DisplayFocusResult(pDC, int(i->x), int(i->y) + 10, i->meanIntensity);
+				DisplayFocusResult(pDC, int(i->x), int(i->y) + 20, i->RMSNoise);
+				DisplayFocusResult(pDC, int(i->x), int(i->y) + 30, i->SignalToNoise);
 				index++;
 			}
 		}
@@ -291,7 +291,9 @@ void COperatorConsole3View::InitPictureData()
 void COperatorConsole3View::OnInitialUpdate()
 {
 	CScrollView::OnInitialUpdate();
-
+	m_logTargetFile.reset(new Logging::CLogTargetFile("OperatorConsole.log", Logging::LOG_LEVEL_DEBUG));
+	m_loggerFactor.getDefaultInstance()->AddTarget(m_logTargetFile.get());
+	LOGMSG_DEBUG("Startup");
 	CSize sizeTotal;
 	// TODO: calculate the total size of this view
 	m_width = m_vidCapture.GetWidth();
@@ -303,7 +305,8 @@ void COperatorConsole3View::OnInitialUpdate()
 	m_OperatorConsoleLockEngaged = false;
 	m_OperatorConsoleSwitchPressed = false;
 	m_CameraRunning = false;
-	m_ThreadRunning = false;
+	m_ProgramStateThreadRunning = false;
+	m_TestingThreadRunning = false;
 	m_ThreadShutdown = false;
 	m_DrawingPicture = false;
 	m_ActiveTestRunning = false;
@@ -336,13 +339,28 @@ void COperatorConsole3View::OnInitialUpdate()
 	if (SUCCEEDED(hr))
 	{
 		OnCameraUseTop8Bits();
-		AfxBeginThread(ThreadProc, this); // <<== START THE THREAD
-		AfxBeginThread(AnalyzeFrameThreadProc, this);
+		m_pTestingThread = AfxBeginThread(ThreadProc, this); // <<== START THE THREAD
+		m_pProgramStateThread = AfxBeginThread(AnalyzeFrameThreadProc, this);
 	}
 	else
 	{
 	}
 
+}
+
+OperatorConsoleState COperatorConsole3View::SetProgramState(OperatorConsoleState nextState)
+{
+	if (nextState != m_programState)
+	{
+		LOGMSG_DEBUG("Changing state from " + std::to_string(m_programState) + " to next state " + std::to_string(nextState));
+		m_programState = nextState;
+		m_stateChange = true;
+	}
+	else
+	{
+		m_stateChange = false;
+	}
+	return nextState;
 }
 
 #define VENDER_CMD_NONE 21
@@ -354,6 +372,7 @@ bool COperatorConsole3View::MagLockEngaged()
 #if defined(USE_SOFTWARE_FOR_STATION)
 	return m_bMagStripeEngaged;
 #else
+	static bool lastState = false;
 	bool magLockEngaged = false;
 	if (m_vidCapture.CameraControl() && m_vidCapture.VideoProcAmp())
 	{
@@ -365,6 +384,11 @@ bool COperatorConsole3View::MagLockEngaged()
 		hr = m_vidCapture.CameraControl()->Get(CameraControl_Focus, &value, &flags);
 		hr = m_vidCapture.CameraControl()->Set(CameraControl_Focus, VENDER_CMD_NONE, flags);
 	}
+	if (magLockEngaged != lastState)
+	{
+		LOGMSG_DEBUG("MagLock state changed to " + std::to_string(magLockEngaged));
+		lastState = magLockEngaged;
+	}
 	return magLockEngaged;
 #endif
 }
@@ -374,6 +398,7 @@ bool COperatorConsole3View::SwitchPressed()
 #if defined(USE_SOFTWARE_FOR_STATION)
 	return m_bCX3ButonPressed;
 #else
+	static bool lastPressed = false;
 	bool switchPressed = false;
 	if (m_vidCapture.CameraControl() && m_vidCapture.VideoProcAmp())
 	{
@@ -385,27 +410,34 @@ bool COperatorConsole3View::SwitchPressed()
 		hr = m_vidCapture.CameraControl()->Get(CameraControl_Focus, &value, &flags);
 		hr = m_vidCapture.CameraControl()->Set(CameraControl_Focus, VENDER_CMD_NONE, flags);
 	}
+	if (lastPressed != switchPressed)
+	{
+		LOGMSG_DEBUG("SwitchPressed changed to " + std::to_string(switchPressed));
+		lastPressed = switchPressed;
+	}
 	return switchPressed;
 #endif
 }
 
 OperatorConsoleState COperatorConsole3View::HandleWaitForCameraLock(bool newState)
 {
-	if (MagLockEngaged())
+	if (newState)
 	{
-		return eStateFocusingCamera;
-	}
-	else
-	{
-		if (newState)
-		{
-
-		}
+		LOGMSG_DEBUG("Enter newState");
 		m_DrawFocusTestResults = false;
 		m_DrawFullChartMTF50 = false;
 		m_DrawFullChartSNR = false;
 		m_RunFocusTest = false;
 		m_bRunTestQuickMTF50 = false;
+		m_bRunTestFullChartMTF50 = false;
+		m_bRunTestFullChartSNR = false;
+	}
+	if (MagLockEngaged())
+	{
+		return SetProgramState(eStateFocusingCamera);
+	}
+	else
+	{
 		CDC* pDC = GetDC();
 		if (pDC)
 		{
@@ -419,7 +451,7 @@ OperatorConsoleState COperatorConsole3View::HandleWaitForCameraLock(bool newStat
 			pDC->TextOut(x, y, "Magnet Switch not locked - video turned off");
 			ReleaseDC(pDC);
 		}
-		return eStateWaitForCameraLock;
+		return SetProgramState(eStateWaitForCameraLock);
 	}
 }
 
@@ -427,6 +459,7 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 {
 	if (newState)
 	{
+		LOGMSG_DEBUG("Enter newState");
 		m_DrawFocusTestResults = false;
 		m_DrawFullChartMTF50 = false;
 		m_DrawFullChartSNR = false;
@@ -444,8 +477,9 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 		}
 		else
 		{
-			MessageBox("Failure to start video capture", "Error", MB_OK);
-			return eStateWaitForCameraLock;
+			LOGMSG_ERROR("Failure to start video capture " + std::to_string(hr));
+			LOGMSG_ERROR("returning eStateWaitForCameraLock");
+			return SetProgramState(eStateWaitForCameraLock);
 		}
 	}
 	CRect rcWhiteSquare(1188,582,1317,733);
@@ -465,7 +499,9 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 					{
 						m_ActiveTestRunning = true;
 						//memcpy(&m_image8DataTesting[0], &m_image8Data[0], m_image8Data.size()); // Copy to backup which will be tested
+						LOGMSG_DEBUG("Copying m_image8Data to m_image8DataTesting for focus testing");
 						memcpy(&m_image8DataTesting[0], &m_image8Data[0], m_image8Data.size()); // Copy to backup which will be tested
+						LOGMSG_DEBUG("Setting TestEvent");
 						m_MatlabImageTestReadyEvent.SetEvent();
 					}
 				}
@@ -505,14 +541,20 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 				}
 			}
 			if (SwitchPressed())
-				return eStateTesting1Camera;
-			return eStateFocusingCamera;
+			{
+				return SetProgramState(eStateTesting1Camera);
+			}
+			return SetProgramState(eStateFocusingCamera);
 		}
 		else
-			return eStateWaitForCameraLock;
+		{
+			return SetProgramState(eStateWaitForCameraLock);
+		}
 	}
 	else
-		return eStateWaitForCameraLock;
+	{
+		return SetProgramState(eStateWaitForCameraLock);
+	}
 }
 
 bool COperatorConsole3View::GetFrame(std::vector<uint8_t>& image8Data, std::vector<uint16_t>& image16Data)
@@ -533,11 +575,13 @@ OperatorConsoleState COperatorConsole3View::HandleTesting1Camera(bool newState)
 	if (MagLockEngaged())
 	{
 		// Get Video Frame
+		LOGMSG_DEBUG("Calling GetFrame and passing in m_image16DataTesting so no need to copy");
 		bool frameValid = GetFrame(m_image8Data, m_image16DataTesting);
 		if (frameValid)
 		{
 			if (newState)
 			{
+				LOGMSG_DEBUG("Enter newState");
 				m_bRunTestQuickMTF50 = false;
 				m_DrawFocusTestResults = false;
 				m_DrawFullChartMTF50 = false;
@@ -556,23 +600,27 @@ OperatorConsoleState COperatorConsole3View::HandleTesting1Camera(bool newState)
 				m_bRunTestQuickMTF50 = false;
 				m_DrawFocusTestResults = false;
 				m_DrawFullChartMTF50 = false;
-				m_DrawFullChartSNR = false;
 				m_RunFocusTest = false;
 
 				m_bRunTestFullChartSNR = true;
 				m_bFullChartSNRDone = false;
+				LOGMSG_DEBUG("Setting TestEvent");
 				m_MatlabImageTestReadyEvent.SetEvent(); // go ahead with the first test - just once
 			}
 			else
 			{
 				if (m_bFullChartSNRDone) // if test is done, then advance to next step
-					return eStateTesting2Camera;
+				{
+					return SetProgramState(eStateTesting2Camera);
+				}
 			}
 		}
-		return eStateTesting1Camera; // waiting for test to be done
+		return SetProgramState(eStateTesting1Camera); // waiting for test to be done
 	}
 	else
-		return eStateWaitForCameraLock; // back to beginning
+	{
+		return SetProgramState(eStateWaitForCameraLock); // back to beginning
+	}
 }
 
 OperatorConsoleState COperatorConsole3View::HandleTesting2Camera(bool newState)
@@ -583,6 +631,7 @@ OperatorConsoleState COperatorConsole3View::HandleTesting2Camera(bool newState)
 	{
 		if (newState)
 		{
+			LOGMSG_DEBUG("Enter newState");
 			m_DrawFocusTestResults = false;
 			m_DrawFullChartMTF50 = false;
 			m_DrawFullChartSNR = true;
@@ -609,6 +658,7 @@ OperatorConsoleState COperatorConsole3View::HandleTesting2Camera(bool newState)
 				imageCount++;
 				if (imageCount < NUM_AVERAGE_IMAGES)
 				{
+					LOGMSG_DEBUG("Averaging in fame " + std::to_string(m_FrameNumber));
 					// Add in the current image to the total
 					for (size_t i = 0; i < m_image16Data.size(); i++)
 					{
@@ -623,56 +673,61 @@ OperatorConsoleState COperatorConsole3View::HandleTesting2Camera(bool newState)
 					{
 						m_image16DataTesting[i] = m_image32Average[i] / imageCount;
 					}
-					m_bRunTestFullChartSNR = false;
 					m_bRunTestFullChartMTF50 = true;
+					m_bFullChartMTF50Done = false;
+					LOGMSG_DEBUG("Setting m_bRunTestFullChartMTF50 to run and setting event");
 					m_MatlabImageTestReadyEvent.SetEvent();
 				}
 			}
 			else if (m_bFullChartMTF50Done)
 			{
-				return eStateReportResults;
+				return SetProgramState(eStateReportResults);
 			}
 		}
-		return eStateTesting2Camera;
+		return SetProgramState(eStateTesting2Camera);
 	}
-	else
-		return eStateWaitForCameraLock;
+	return SetProgramState(eStateWaitForCameraLock);
 }
 
 OperatorConsoleState COperatorConsole3View::HandleReportResults(bool newState)
 {
 	if (newState)
 	{
-
+		LOGMSG_DEBUG("Enter newState");
 	}
-	return eStateReportResults;
-}
+	return SetProgramState(eStateReportResults);}
 
 UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 {
 	COperatorConsole3View* pThis = (COperatorConsole3View*)pParam;
+	LOGMSG_DEBUG("Enter thread - calling matlab Initialize");
+	pThis->m_TestingThreadRunning = true;
 	HRESULT hr = ::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
 	if (SUCCEEDED(hr) && pThis->m_matlabTestCode.Initialize())
 	{
+		LOGMSG_DEBUG("Enter");
 		LARGE_INTEGER Frequency;
 		QueryPerformanceFrequency(&Frequency);
 		LARGE_INTEGER timeStart, timeEnd;
 		HANDLE handles[2];
 		handles[0] = pThis->m_ShutdownEvent;
 		handles[1] = pThis->m_MatlabImageTestReadyEvent;
+		LOGMSG_DEBUG("Running testing loop");
 		while (!pThis->m_ThreadShutdown)
 		{
 			DWORD waitResult = WaitForMultipleObjects(2, handles, FALSE, INFINITE);
 			if ((WAIT_OBJECT_0+1) == waitResult)
 			{
 				::QueryPerformanceCounter(&timeStart);
+				LOGMSG_DEBUG("Received signal to run test");
 				pThis->m_ActiveTestRunning = true;
 				CFile file;
 				if (pThis->m_bRunTestQuickMTF50)
 				{
-					OutputDebugString("Running RunTestQuickMTF50\n");
+					LOGMSG_DEBUG("Running RunTestQuickMTF50 - turning off m_bQuickMTF50Done");
 					pThis->m_bQuickMTF50Done = false;
 					pThis->m_DrawFocusTestResults = pThis->m_matlabTestCode.RunTestQuickMTF50(pThis->m_image8DataTesting, pThis->m_width, pThis->m_height, pThis->registrationCoordinates, pThis->m_outputQuickMTF50);
+					LOGMSG_DEBUG("After RunTestQuickMTF50 - " + std::to_string(pThis->m_DrawFocusTestResults));
 					if (pThis->m_DrawFocusTestResults &&
 						pThis->OpenCSV(file, "FocusTest.csv", "CameraID,FrameNum,MTF50-1,MTF50-2,MTF50-3,MTF50-4,MTF50-5"))
 					{
@@ -688,12 +743,14 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 						file.Write("\n", 1);
 					}
 					pThis->m_bQuickMTF50Done = true;
+					LOGMSG_DEBUG("Turning on m_bQuickMTF50Done");
 				}
 				else if (pThis->m_bRunTestFullChartMTF50)
 				{
 					pThis->m_bFullChartMTF50Done = false;
-					OutputDebugString("Running RunTestFullChartMTF50 - with average\n");
+					LOGMSG_DEBUG("Running RunTestFullChartMTF50 - with average");
 					pThis->m_DrawFullChartMTF50 = pThis->m_matlabTestCode.RunTestFullChartMTF50(pThis->m_image16DataTesting, pThis->m_width, pThis->m_height, pThis->m_outputFullChartMTF50);
+					LOGMSG_DEBUG("After RunTestFullChartMTF50 - " + std::to_string(pThis->m_DrawFullChartMTF50));
 					if (pThis->m_DrawFullChartMTF50)
 					{
 						std::string header = "CameraID,FrameNum";
@@ -723,12 +780,15 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 						}
 					}
 					pThis->m_bFullChartMTF50Done = true;
+					pThis->m_bRunTestFullChartMTF50 = false;
+					LOGMSG_DEBUG("Turning off m_bRunTestFullChartMTF50 and turning on m_bFullChartMTF50Done");
 				}
 				else if (pThis->m_bRunTestFullChartSNR)
 				{
 					pThis->m_bFullChartSNRDone = false;
-					OutputDebugString("Running RunTestFullChartSNR\n");
+					LOGMSG_DEBUG("Running RunTestFullChartSNR");
 					pThis->m_DrawFullChartSNR = pThis->m_matlabTestCode.RunTestFullChartSNR(pThis->m_image16DataTesting, pThis->m_width, pThis->m_height, pThis->m_outputFullChartSNR);
+					LOGMSG_DEBUG("After RunTestFullChartSNR - " + std::to_string(pThis->m_DrawFullChartSNR));
 					if (pThis->m_DrawFullChartSNR)
 					{
 						std::string header = "CameraID,FrameNum";
@@ -767,28 +827,34 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 					}
 					pThis->m_bFullChartSNRDone = true;
 					pThis->m_bRunTestFullChartSNR = false; // just run one time
+					LOGMSG_DEBUG("Turning off m_bRunTestFullChartSNR and turning on m_bRunTestFullChartSNR");
 				}
 				else
 				{
-					OutputDebugString("No test run\n");
+					LOGMSG_DEBUG("No test set to runrun");
 				}
 				pThis->m_MatlabImageTestReadyEvent.ResetEvent();
 				pThis->m_ActiveTestRunning = false;
 				::QueryPerformanceCounter(&timeEnd);
 				LONGLONG diff = (timeEnd.QuadPart - timeStart.QuadPart) / (Frequency.QuadPart / 1000);
+				LOGMSG_DEBUG("Time to run - " + std::to_string(diff) + "ms");
 				if (diff < 100)
 					Sleep(1);
 			}
 		}
+		LOGMSG_DEBUG("Shutdown matlab code");
 		pThis->m_matlabTestCode.Shutdown();
 	}
+	pThis->m_TestingThreadRunning = false;
+	LOGMSG_DEBUG("Leave");
 	return 0;
 }
 
 UINT __cdecl COperatorConsole3View::ThreadProc(LPVOID pParam)
 {
 	COperatorConsole3View* pThis = (COperatorConsole3View*)pParam;
-	pThis->m_ThreadRunning = true;
+	pThis->m_ProgramStateThreadRunning = true;
+	LOGMSG_DEBUG("Program State thread running");
 	::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
 	DWORD dwFrameTime = 1000 / 13; // 66 ms
 	LARGE_INTEGER Frequency;
@@ -838,11 +904,13 @@ UINT __cdecl COperatorConsole3View::ThreadProc(LPVOID pParam)
 		if ((nSleepTime < 0) || (nSleepTime > 1000))
 			nSleepTime = 1;
 		char buffer[MAX_PATH];
-		sprintf_s(buffer, sizeof(buffer), "Frame took %lldms, sleeping for %dms\n", diff, nSleepTime);
-		OutputDebugStringA(buffer);
+		sprintf_s(buffer, sizeof(buffer), "Frame took %lldms, sleeping for %dms", diff, nSleepTime);
+		LOGMSG_DEBUG(buffer);
 		Sleep(nSleepTime);
 	}
-	pThis->m_ThreadRunning = false;
+	CoUninitialize();
+	pThis->m_ProgramStateThreadRunning = false;
+	LOGMSG_DEBUG("Program State Thread shutting down");
 	return 0;   // thread completed successfully
 }
 
@@ -1019,19 +1087,18 @@ void COperatorConsole3View::OnCameraOperatorConsoleLock()
 		else
 		{
 			pMenu->CheckMenuItem(ID_CAMERA_OPERATORCONSOLELOCK, MF_UNCHECKED | MF_BYCOMMAND);
-
 		}
 	}
 }
 
 void COperatorConsole3View::OnDestroy()
 {
-	// TODO: Add your message handler code here and/or call default
+	LOGMSG_DEBUG("Get threads to shut down");
 	m_ThreadShutdown = true;
-	while (m_ThreadRunning)
-	{
-		Sleep(1);
-	}
+	m_ShutdownEvent.SetEvent();
+	WaitForSingleObject(m_pProgramStateThread->m_hThread, INFINITE);
+	WaitForSingleObject(m_pTestingThread->m_hThread, INFINITE);
+	LOGMSG_DEBUG("Threads shut down, continue shutting down...");
 	CScrollView::OnDestroy();
 }
 

@@ -201,6 +201,7 @@
     <ClInclude Include="dxtrans.h" />
     <ClInclude Include="FileView.h" />
     <ClInclude Include="framework.h" />
+    <ClInclude Include="Logging.h" />
     <ClInclude Include="MainFrm.h" />
     <ClInclude Include="MatlabMTF50\MatlabMTF50Lib_2.h" />
     <ClInclude Include="MatlabTestCode.h" />
@@ -220,6 +221,7 @@
   <ItemGroup>
     <ClCompile Include="ClassView.cpp" />
     <ClCompile Include="FileView.cpp" />
+    <ClCompile Include="Logging.cpp" />
     <ClCompile Include="MainFrm.cpp" />
     <ClCompile Include="MatlabTestCode.cpp" />
     <ClCompile Include="OperatorConsole3.cpp" />
