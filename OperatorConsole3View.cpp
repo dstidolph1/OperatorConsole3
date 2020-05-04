@@ -79,7 +79,7 @@ COperatorConsole3View::COperatorConsole3View() noexcept :
 	m_zoomMultiplier(1), m_shrinkDisplay(false), m_magnifyDisplay(false),
 	m_width(PICTURE_WIDTH), m_height(PICTURE_HEIGHT), m_maxPixelValueInSquare(0), m_FrameNumber(0),
 	m_MaxSaveFrames(10), m_RunFocusTest(false), m_pBitmapInfoSaved(nullptr), m_ShutdownEvent(FALSE, TRUE, NULL, NULL),
-	m_MatlabImageTestReadyEvent(FALSE, TRUE, NULL, NULL), m_DrawFocusTestResults(false), m_bMagStripeEngaged(false),
+	m_MatlabImageTestReadyEvent(FALSE, FALSE, NULL, NULL), m_DrawFocusTestResults(false), m_bMagStripeEngaged(false),
 	m_bCX3ButonPressed(false), m_bRunTestQuickMTF50(false), m_bRunTestFullChartMTF50(false), m_bRunTestFullChartSNR(false),
 	m_DrawFullChartMTF50(false), m_DrawFullChartSNR(false), m_bFullChartMTF50Done(false), m_bFullChartSNRDone(false),
 	m_bQuickMTF50Done(false), m_stateChange(false), m_TestingThreadRunning(false),
@@ -291,8 +291,7 @@ void COperatorConsole3View::InitPictureData()
 void COperatorConsole3View::OnInitialUpdate()
 {
 	CScrollView::OnInitialUpdate();
-	m_logTargetFile.reset(new Logging::CLogTargetFile("OperatorConsole.log", Logging::LOG_LEVEL_DEBUG));
-	m_loggerFactor.getDefaultInstance()->AddTarget(m_logTargetFile.get());
+	m_loggerFactor.getDefaultInstance()->AddTarget(new Logging::CLogTargetFile("OperatorConsole.log", Logging::LOG_LEVEL_DEBUG));
 	LOGMSG_DEBUG("Startup");
 	CSize sizeTotal;
 	// TODO: calculate the total size of this view
@@ -575,7 +574,6 @@ OperatorConsoleState COperatorConsole3View::HandleTesting1Camera(bool newState)
 	if (MagLockEngaged())
 	{
 		// Get Video Frame
-		LOGMSG_DEBUG("Calling GetFrame and passing in m_image16DataTesting so no need to copy");
 		bool frameValid = GetFrame(m_image8Data, m_image16DataTesting);
 		if (frameValid)
 		{
@@ -609,8 +607,10 @@ OperatorConsoleState COperatorConsole3View::HandleTesting1Camera(bool newState)
 			}
 			else
 			{
+				LOGMSG_DEBUG("Waiting on FullChartSNR to be done");
 				if (m_bFullChartSNRDone) // if test is done, then advance to next step
 				{
+					LOGMSG_DEBUG("FullChartSNR is done, so advance state");
 					return SetProgramState(eStateTesting2Camera);
 				}
 			}
@@ -667,6 +667,7 @@ OperatorConsoleState COperatorConsole3View::HandleTesting2Camera(bool newState)
 				}
 				else
 				{
+					LOGMSG_DEBUG("Build average frame, now test");
 					// Compute the average
 					makingAverage = false;
 					for (size_t i = 0; i < m_image32Average.size(); i++)
@@ -833,7 +834,6 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 				{
 					LOGMSG_DEBUG("No test set to runrun");
 				}
-				pThis->m_MatlabImageTestReadyEvent.ResetEvent();
 				pThis->m_ActiveTestRunning = false;
 				::QueryPerformanceCounter(&timeEnd);
 				LONGLONG diff = (timeEnd.QuadPart - timeStart.QuadPart) / (Frequency.QuadPart / 1000);
@@ -860,7 +860,6 @@ UINT __cdecl COperatorConsole3View::ThreadProc(LPVOID pParam)
 	LARGE_INTEGER Frequency;
 	QueryPerformanceFrequency(&Frequency);
 	LARGE_INTEGER timeStart, timeEnd;
-	bool stateChange = true;
 	OperatorConsoleState nextState = pThis->m_programState;
 	while (!pThis->m_ThreadShutdown)
 	{
@@ -875,37 +874,30 @@ UINT __cdecl COperatorConsole3View::ThreadProc(LPVOID pParam)
 			switch (pThis->m_programState)
 			{
 			case eStateWaitForCameraLock:
-				nextState = pThis->HandleWaitForCameraLock(stateChange);
+				nextState = pThis->HandleWaitForCameraLock(pThis->m_stateChange);
 				break;
 			case eStateFocusingCamera:
-				nextState = pThis->HandleFocusingCamera(stateChange);
+				nextState = pThis->HandleFocusingCamera(pThis->m_stateChange);
 				break;
 			case eStateTesting1Camera:
-				nextState = pThis->HandleTesting1Camera(stateChange);
+				nextState = pThis->HandleTesting1Camera(pThis->m_stateChange);
 				break;
 			case eStateTesting2Camera:
-				nextState = pThis->HandleTesting2Camera(stateChange);
+				nextState = pThis->HandleTesting2Camera(pThis->m_stateChange);
 				break;
 			case eStateReportResults:
-				nextState = pThis->HandleReportResults(stateChange);
+				nextState = pThis->HandleReportResults(pThis->m_stateChange);
 				break;
 			}
-			if (nextState != pThis->m_programState)
-			{
-				pThis->m_programState = nextState;
-				stateChange = true;
-			}
-			else
-				stateChange = false;
 		}
 		QueryPerformanceCounter(&timeEnd);
 		LONGLONG diff = (timeEnd.QuadPart - timeStart.QuadPart) / (Frequency.QuadPart / 1000);
 		int nSleepTime = dwFrameTime - int(diff);
 		if ((nSleepTime < 0) || (nSleepTime > 1000))
 			nSleepTime = 1;
-		char buffer[MAX_PATH];
-		sprintf_s(buffer, sizeof(buffer), "Frame took %lldms, sleeping for %dms", diff, nSleepTime);
-		LOGMSG_DEBUG(buffer);
+		//char buffer[MAX_PATH];
+		//sprintf_s(buffer, sizeof(buffer), "Frame took %lldms, sleeping for %dms", diff, nSleepTime);
+		//LOGMSG_DEBUG(buffer);
 		Sleep(nSleepTime);
 	}
 	CoUninitialize();

@@ -27,6 +27,7 @@ THE SOFTWARE.
 
 #include <atlsimpcoll.h>
 #include <string>
+#include <atlstr.h>
 
 namespace Logging
 {

@@ -89,7 +89,6 @@ protected:
 	DWORD m_sizeBitmapInfo;
 	std::string m_CameraID;
 	Logging::CLoggerFactory m_loggerFactor;
-	std::unique_ptr<Logging::CLogTargetFile> m_logTargetFile;
 	CWinThread* m_pProgramStateThread;
 	CWinThread* m_pTestingThread;
 	bool m_OperatorConsoleLockEngaged;

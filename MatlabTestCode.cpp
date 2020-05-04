@@ -1,6 +1,7 @@
 #include "MatlabTestCode.h"
 #include <iostream>
 #include <numeric> // for iota
+#include "Logging.h"
 
 MatlabTestCode::MatlabTestCode()
 {
@@ -29,11 +30,11 @@ bool MatlabTestCode::Initialize()
 	catch (matlab::cpplib::CppSharedLibException& e)
 	{
 		std::string s = e.what();
-		OutputDebugStringA(s.c_str());
+		LOGMSG_ERROR(s.c_str());
 	}
 	catch (const std::exception& exc) {
 		std::string s = exc.what();
-		OutputDebugStringA(s.c_str());
+		LOGMSG_ERROR(s.c_str());
 	}
 	return success;
 }
@@ -84,32 +85,32 @@ bool MatlabTestCode::RunTestFullChartMTF50(std::vector<uint16_t>& image, int wid
 	catch (matlab::OutOfMemoryException& e)
 	{
 		std::string s = e.what();
-		OutputDebugStringA(s.c_str());
+		LOGMSG_ERROR(s.c_str());
 	}
 	catch (matlab::data::InvalidArrayTypeException& e)
 	{
 		std::string s = e.what();
-		OutputDebugStringA(s.c_str());
+		LOGMSG_ERROR(s.c_str());
 	}
 	catch (matlab::data::InvalidMemoryLayoutException& e)
 	{
 		std::string s = e.what();
-		OutputDebugStringA(s.c_str());
+		LOGMSG_ERROR(s.c_str());
 	}
 	catch (matlab::data::InvalidDimensionsInRowMajorArrayException& e)
 	{
 		std::string s = e.what();
-		OutputDebugStringA(s.c_str());
+		LOGMSG_ERROR(s.c_str());
 	}
 	catch (matlab::data::NumberOfElementsExceedsMaximumException& e)
 	{
 		std::string s = e.what();
-		OutputDebugStringA(s.c_str());
+		LOGMSG_ERROR(s.c_str());
 	}
 	catch (matlab::Exception& e)
 	{
 		std::string s = e.what();
-		OutputDebugStringA(s.c_str());
+		LOGMSG_ERROR(s.c_str());
 	}
 	return success;
 }
@@ -163,32 +164,32 @@ bool MatlabTestCode::RunTestFullChartSNR(std::vector<uint16_t>& image, int width
 	catch (matlab::OutOfMemoryException& e)
 	{
 		std::string s = e.what();
-		OutputDebugStringA(s.c_str());
+		LOGMSG_ERROR(s.c_str());
 	}
 	catch (matlab::data::InvalidArrayTypeException& e)
 	{
 		std::string s = e.what();
-		OutputDebugStringA(s.c_str());
+		LOGMSG_ERROR(s.c_str());
 	}
 	catch (matlab::data::InvalidMemoryLayoutException& e)
 	{
 		std::string s = e.what();
-		OutputDebugStringA(s.c_str());
+		LOGMSG_ERROR(s.c_str());
 	}
 	catch (matlab::data::InvalidDimensionsInRowMajorArrayException& e)
 	{
 		std::string s = e.what();
-		OutputDebugStringA(s.c_str());
+		LOGMSG_ERROR(s.c_str());
 	}
 	catch (matlab::data::NumberOfElementsExceedsMaximumException& e)
 	{
 		std::string s = e.what();
-		OutputDebugStringA(s.c_str());
+		LOGMSG_ERROR(s.c_str());
 	}
 	catch (matlab::Exception& e)
 	{
 		std::string s = e.what();
-		OutputDebugStringA(s.c_str());
+		LOGMSG_ERROR(s.c_str());
 	}
 	return success;
 }
@@ -235,32 +236,32 @@ bool MatlabTestCode::RunTestQuickMTF50(std::vector<uint8_t>& image, int width, i
 	catch (matlab::OutOfMemoryException& e)
 	{
 		std::string s = e.what();
-		OutputDebugStringA(s.c_str());
+		LOGMSG_ERROR(s.c_str());
 	}
 	catch (matlab::data::InvalidArrayTypeException& e)
 	{
 		std::string s = e.what();
-		OutputDebugStringA(s.c_str());
+		LOGMSG_ERROR(s.c_str());
 	}
 	catch (matlab::data::InvalidMemoryLayoutException& e)
 	{
 		std::string s = e.what();
-		OutputDebugStringA(s.c_str());
+		LOGMSG_ERROR(s.c_str());
 	}
 	catch (matlab::data::InvalidDimensionsInRowMajorArrayException& e)
 	{
 		std::string s = e.what();
-		OutputDebugStringA(s.c_str());
+		LOGMSG_ERROR(s.c_str());
 	}
 	catch (matlab::data::NumberOfElementsExceedsMaximumException& e)
 	{
 		std::string s = e.what();
-		OutputDebugStringA(s.c_str());
+		LOGMSG_ERROR(s.c_str());
 	}
 	catch (matlab::Exception& e)
 	{
 		std::string s = e.what();
-		OutputDebugStringA(s.c_str());
+		LOGMSG_ERROR(s.c_str());
 	}
 	return success;
 }
