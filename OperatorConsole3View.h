@@ -23,7 +23,8 @@ typedef enum
 {
 	eStateWaitForCameraLock,
 	eStateFocusingCamera,
-	eStateTestingCamera,
+	eStateTesting1Camera,
+	eStateTesting2Camera,
 	eStateReportResults
 } OperatorConsoleState;
 
@@ -62,7 +63,8 @@ protected:
 	static UINT __cdecl AnalyzeFrameThreadProc(LPVOID pParam);
 	OperatorConsoleState HandleWaitForCameraLock(bool newState);
 	OperatorConsoleState HandleFocusingCamera(bool newState);
-	OperatorConsoleState HandleTestingCamera(bool newState);
+	OperatorConsoleState HandleTesting1Camera(bool newState);
+	OperatorConsoleState HandleTesting2Camera(bool newState);
 	OperatorConsoleState HandleReportResults(bool newState);
 	CMenu* GetParentMenu();
 	void SetStatusBarText(CString text);
@@ -109,8 +111,11 @@ protected:
 	bool m_bMagStripeEngaged;
 	bool m_bCX3ButonPressed;
 	bool m_bRunTestQuickMTF50;
+	bool m_bQuickMTF50Done;
 	bool m_bRunTestFullChartMTF50;
+	bool m_bFullChartMTF50Done;
 	bool m_bRunTestFullChartSNR;
+	bool m_bFullChartSNRDone;
 	CEvent m_ShutdownEvent;
 	CEvent m_MatlabImageTestReadyEvent;
 	uint8_t m_maxPixelValueInSquare;

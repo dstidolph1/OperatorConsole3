@@ -180,7 +180,7 @@ HRESULT VideoCapture::GetCameraFrame(std::vector<uint8_t>& image8Data, std::vect
 							maxPixelValue = *iDest8;
 					}
 				}
-				*iSrc = *iSrc << 6;
+				//*iSrc = *iSrc << 6;
 				iDest8++;
 				iSrc++;
 			}

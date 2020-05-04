@@ -10,13 +10,15 @@ namespace md = matlab::data;
 
 typedef struct
 {
-	int x;
-	int y;
+	double x;
+	double y;
 	double mtf50;
 } FullChartMTF50Data;
 
 typedef struct
 {
+	double x;
+	double y;
 	double meanIntensity;
 	double RMSNoise;
 	double SignalToNoise;

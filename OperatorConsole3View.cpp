@@ -81,7 +81,8 @@ COperatorConsole3View::COperatorConsole3View() noexcept :
 	m_MaxSaveFrames(10), m_RunFocusTest(false), m_pBitmapInfoSaved(nullptr), m_ShutdownEvent(FALSE, TRUE, NULL, NULL),
 	m_MatlabImageTestReadyEvent(FALSE, TRUE, NULL, NULL), m_DrawFocusTestResults(false), m_bMagStripeEngaged(false),
 	m_bCX3ButonPressed(false), m_bRunTestQuickMTF50(false), m_bRunTestFullChartMTF50(false), m_bRunTestFullChartSNR(false),
-	m_DrawFullChartMTF50(false), m_DrawFullChartSNR(false)
+	m_DrawFullChartMTF50(false), m_DrawFullChartSNR(false), m_bFullChartMTF50Done(false), m_bFullChartSNRDone(false),
+	m_bQuickMTF50Done(false)
 
 {
 	// TODO: add construction code here
@@ -231,7 +232,7 @@ bool COperatorConsole3View::OpenCSV(CFile& file, CString filename, CString heade
 	bool success = false;
 	if (PathFileExists(filename.GetString()))
 	{
-		if (file.Open(filename, CFile::typeText | CFile::modeNoTruncate | CFile::modeWrite))
+		if (file.Open(filename, CFile::modeCreate | CFile::modeNoTruncate | CFile::modeWrite))
 		{
 			file.SeekToEnd();
 			success = true;
@@ -239,7 +240,7 @@ bool COperatorConsole3View::OpenCSV(CFile& file, CString filename, CString heade
 	}
 	else // File does NOT exist, so we have to open and write headers
 	{
-		if (file.Open(filename, CFile::typeText | CFile::modeCreate | CFile::modeWrite))
+		if (file.Open(filename, CFile::modeCreate | CFile::modeWrite))
 		{
 			file.Write(headers, headers.GetLength());
 			file.Write("\n", 1);
@@ -388,7 +389,6 @@ bool COperatorConsole3View::SwitchPressed()
 #endif
 }
 
-
 OperatorConsoleState COperatorConsole3View::HandleWaitForCameraLock(bool newState)
 {
 	if (MagLockEngaged())
@@ -397,6 +397,10 @@ OperatorConsoleState COperatorConsole3View::HandleWaitForCameraLock(bool newStat
 	}
 	else
 	{
+		if (newState)
+		{
+
+		}
 		m_DrawFocusTestResults = false;
 		m_DrawFullChartMTF50 = false;
 		m_DrawFullChartSNR = false;
@@ -430,6 +434,7 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 		m_CameraRunning = true;
 		m_DrawingPicture = true;
 		m_bRunTestQuickMTF50 = true;
+		m_bQuickMTF50Done = false;
 		HRESULT hr = m_vidCapture.StartVideoCapture();
 		if (SUCCEEDED(hr))
 		{
@@ -500,7 +505,7 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 				}
 			}
 			if (SwitchPressed())
-				return eStateTestingCamera;
+				return eStateTesting1Camera;
 			return eStateFocusingCamera;
 		}
 		else
@@ -523,20 +528,67 @@ bool COperatorConsole3View::GetFrame(std::vector<uint8_t>& image8Data, std::vect
 	return success;
 }
 
-OperatorConsoleState COperatorConsole3View::HandleTestingCamera(bool newState)
+OperatorConsoleState COperatorConsole3View::HandleTesting1Camera(bool newState)
+{
+	if (MagLockEngaged())
+	{
+		// Get Video Frame
+		bool frameValid = GetFrame(m_image8Data, m_image16DataTesting);
+		if (frameValid)
+		{
+			if (newState)
+			{
+				m_bRunTestQuickMTF50 = false;
+				m_DrawFocusTestResults = false;
+				m_DrawFullChartMTF50 = false;
+				m_DrawFullChartSNR = false;
+				m_RunFocusTest = false;
+			}
+			// Draw video frame
+			ReadLock lock(m_pictureLock);
+			CDC* pDC = GetDC();
+			OnDraw(pDC);
+			ReleaseDC(pDC);
+
+			if (newState)
+			{
+				// We have frame - must test it
+				m_bRunTestQuickMTF50 = false;
+				m_DrawFocusTestResults = false;
+				m_DrawFullChartMTF50 = false;
+				m_DrawFullChartSNR = false;
+				m_RunFocusTest = false;
+
+				m_bRunTestFullChartSNR = true;
+				m_bFullChartSNRDone = false;
+				m_MatlabImageTestReadyEvent.SetEvent(); // go ahead with the first test - just once
+			}
+			else
+			{
+				if (m_bFullChartSNRDone) // if test is done, then advance to next step
+					return eStateTesting2Camera;
+			}
+		}
+		return eStateTesting1Camera; // waiting for test to be done
+	}
+	else
+		return eStateWaitForCameraLock; // back to beginning
+}
+
+OperatorConsoleState COperatorConsole3View::HandleTesting2Camera(bool newState)
 {
 	static bool makingAverage = false;
 	static int imageCount = 0;
-	m_bRunTestQuickMTF50 = false;
-	m_DrawFocusTestResults = false;
-	m_DrawFullChartMTF50 = false;
-	m_DrawFullChartSNR = false;
-	m_RunFocusTest = false;
 	if (MagLockEngaged())
 	{
 		if (newState)
 		{
-			m_bRunTestFullChartSNR = true;
+			m_DrawFocusTestResults = false;
+			m_DrawFullChartMTF50 = false;
+			m_DrawFullChartSNR = true;
+			m_RunFocusTest = false;
+			m_bRunTestQuickMTF50 = false;
+			m_bFullChartSNRDone = false;
 			makingAverage = true;
 			imageCount = 0;
 			// clear image average buffer
@@ -552,13 +604,12 @@ OperatorConsoleState COperatorConsole3View::HandleTestingCamera(bool newState)
 			CDC* pDC = GetDC();
 			OnDraw(pDC);
 			ReleaseDC(pDC);
-			m_image16DataTesting = m_image16Data;
-			m_MatlabImageTestReadyEvent.SetEvent(); // go ahead with the first test - just once
 			if (makingAverage)
 			{
 				imageCount++;
 				if (imageCount < NUM_AVERAGE_IMAGES)
 				{
+					// Add in the current image to the total
 					for (size_t i = 0; i < m_image16Data.size(); i++)
 					{
 						m_image32Average[i] += m_image16Data[i];
@@ -566,8 +617,9 @@ OperatorConsoleState COperatorConsole3View::HandleTestingCamera(bool newState)
 				}
 				else
 				{
+					// Compute the average
 					makingAverage = false;
-					for (size_t i = 0; i < m_image16Data.size(); i++)
+					for (size_t i = 0; i < m_image32Average.size(); i++)
 					{
 						m_image16DataTesting[i] = m_image32Average[i] / imageCount;
 					}
@@ -576,9 +628,12 @@ OperatorConsoleState COperatorConsole3View::HandleTestingCamera(bool newState)
 					m_MatlabImageTestReadyEvent.SetEvent();
 				}
 			}
+			else if (m_bFullChartMTF50Done)
+			{
+				return eStateReportResults;
+			}
 		}
-		// do test
-		return eStateTestingCamera;
+		return eStateTesting2Camera;
 	}
 	else
 		return eStateWaitForCameraLock;
@@ -586,20 +641,11 @@ OperatorConsoleState COperatorConsole3View::HandleTestingCamera(bool newState)
 
 OperatorConsoleState COperatorConsole3View::HandleReportResults(bool newState)
 {
-	if (MagLockEngaged())
+	if (newState)
 	{
-		if (newState)
-		{
-			m_DrawFocusTestResults = false;
-			m_DrawFullChartMTF50 = false;
-			m_DrawFullChartSNR = false;
-			m_RunFocusTest = false;
-			m_bRunTestQuickMTF50 = false;
-		}
-		return eStateReportResults;
+
 	}
-	else
-		return eStateWaitForCameraLock;
+	return eStateReportResults;
 }
 
 UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
@@ -624,6 +670,8 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 				CFile file;
 				if (pThis->m_bRunTestQuickMTF50)
 				{
+					OutputDebugString("Running RunTestQuickMTF50\n");
+					pThis->m_bQuickMTF50Done = false;
 					pThis->m_DrawFocusTestResults = pThis->m_matlabTestCode.RunTestQuickMTF50(pThis->m_image8DataTesting, pThis->m_width, pThis->m_height, pThis->registrationCoordinates, pThis->m_outputQuickMTF50);
 					if (pThis->m_DrawFocusTestResults &&
 						pThis->OpenCSV(file, "FocusTest.csv", "CameraID,FrameNum,MTF50-1,MTF50-2,MTF50-3,MTF50-4,MTF50-5"))
@@ -639,9 +687,12 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 						}
 						file.Write("\n", 1);
 					}
+					pThis->m_bQuickMTF50Done = true;
 				}
 				else if (pThis->m_bRunTestFullChartMTF50)
 				{
+					pThis->m_bFullChartMTF50Done = false;
+					OutputDebugString("Running RunTestFullChartMTF50 - with average\n");
 					pThis->m_DrawFullChartMTF50 = pThis->m_matlabTestCode.RunTestFullChartMTF50(pThis->m_image16DataTesting, pThis->m_width, pThis->m_height, pThis->m_outputFullChartMTF50);
 					if (pThis->m_DrawFullChartMTF50)
 					{
@@ -668,17 +719,23 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 								file.Write(text.c_str(), UINT(text.length()));
 							}
 							file.Write("\n", 1);
+							pThis->m_bRunTestFullChartMTF50 = false;
 						}
 					}
+					pThis->m_bFullChartMTF50Done = true;
 				}
 				else if (pThis->m_bRunTestFullChartSNR)
 				{
+					pThis->m_bFullChartSNRDone = false;
+					OutputDebugString("Running RunTestFullChartSNR\n");
 					pThis->m_DrawFullChartSNR = pThis->m_matlabTestCode.RunTestFullChartSNR(pThis->m_image16DataTesting, pThis->m_width, pThis->m_height, pThis->m_outputFullChartSNR);
 					if (pThis->m_DrawFullChartSNR)
 					{
 						std::string header = "CameraID,FrameNum";
 						for (size_t i = 0; i < pThis->m_outputFullChartSNR.size(); i++)
 						{
+							header += ",X-" + std::to_string(i);
+							header += ",Y-" + std::to_string(i);
 							header += ",MeanIntensity-" + std::to_string(i);
 							header += ",RMSNoise-" + std::to_string(i);
 							header += ",SignalToNoise-" + std::to_string(i);
@@ -691,24 +748,36 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 							for (auto i = pThis->m_outputFullChartSNR.begin(); i != pThis->m_outputFullChartSNR.end(); i++)
 							{
 								file.Write(",", 1);
-								std::string text = std::to_string(i->meanIntensity);
+								std::string text = std::to_string(i->x);
 								file.Write(text.c_str(), UINT(text.length()));
 								file.Write(",", 1);
+								text = std::to_string(i->y);
 								text = std::to_string(i->meanIntensity);
 								file.Write(text.c_str(), UINT(text.length()));
 								file.Write(",", 1);
-								text = std::to_string(i->meanIntensity);
+								text = std::to_string(i->RMSNoise);
+								file.Write(text.c_str(), UINT(text.length()));
+								file.Write(",", 1);
+								text = std::to_string(i->SignalToNoise);
 								file.Write(text.c_str(), UINT(text.length()));
 							}
 							file.Write("\n", 1);
 						}
+						pThis->m_bRunTestFullChartSNR = false;
 					}
+					pThis->m_bFullChartSNRDone = true;
 					pThis->m_bRunTestFullChartSNR = false; // just run one time
+				}
+				else
+				{
+					OutputDebugString("No test run\n");
 				}
 				pThis->m_MatlabImageTestReadyEvent.ResetEvent();
 				pThis->m_ActiveTestRunning = false;
 				::QueryPerformanceCounter(&timeEnd);
 				LONGLONG diff = (timeEnd.QuadPart - timeStart.QuadPart) / (Frequency.QuadPart / 1000);
+				if (diff < 100)
+					Sleep(1);
 			}
 		}
 		pThis->m_matlabTestCode.Shutdown();
@@ -720,7 +789,7 @@ UINT __cdecl COperatorConsole3View::ThreadProc(LPVOID pParam)
 {
 	COperatorConsole3View* pThis = (COperatorConsole3View*)pParam;
 	pThis->m_ThreadRunning = true;
-	HRESULT hr = ::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+	::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
 	DWORD dwFrameTime = 1000 / 13; // 66 ms
 	LARGE_INTEGER Frequency;
 	QueryPerformanceFrequency(&Frequency);
@@ -745,8 +814,11 @@ UINT __cdecl COperatorConsole3View::ThreadProc(LPVOID pParam)
 			case eStateFocusingCamera:
 				nextState = pThis->HandleFocusingCamera(stateChange);
 				break;
-			case eStateTestingCamera:
-				nextState = pThis->HandleTestingCamera(stateChange);
+			case eStateTesting1Camera:
+				nextState = pThis->HandleTesting1Camera(stateChange);
+				break;
+			case eStateTesting2Camera:
+				nextState = pThis->HandleTesting2Camera(stateChange);
 				break;
 			case eStateReportResults:
 				nextState = pThis->HandleReportResults(stateChange);
