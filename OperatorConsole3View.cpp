@@ -354,6 +354,18 @@ OperatorConsoleState COperatorConsole3View::SetProgramState(OperatorConsoleState
 		LOGMSG_DEBUG("Changing state from " + std::to_string(m_programState) + " to next state " + std::to_string(nextState));
 		m_programState = nextState;
 		m_stateChange = true;
+		std::string text(m_CameraID);
+		text += " - ";
+		switch (nextState)
+		{
+		case eStateWaitForCameraLock: text += "Waiting for camera lock to engage"; break;
+		case eStateFocusingCamera: text += "Please focus camera and press button when ready"; break;
+		case eStateTesting1Camera: text += "Running Signal-To-Noise Ratio test"; break;
+		case eStateTesting2Camera: text += "Building average image and running full MTF50 test"; break;
+		case eStateReportResults: text += "Done with tests - please open/close magnetic lock and test new camera"; break;
+		default: text += "Unknown state: " + std::to_string(nextState); break;
+		}
+		AfxGetMainWnd()->SetWindowTextA(text.c_str());
 	}
 	else
 	{
@@ -687,14 +699,39 @@ OperatorConsoleState COperatorConsole3View::HandleTesting2Camera(bool newState)
 		}
 		return SetProgramState(eStateTesting2Camera);
 	}
+	else
+	{
+		return SetProgramState(eStateWaitForCameraLock); // back to beginning
+	}
 	return SetProgramState(eStateWaitForCameraLock);
 }
 
 OperatorConsoleState COperatorConsole3View::HandleReportResults(bool newState)
 {
-	if (newState)
+	if (MagLockEngaged())
 	{
-		LOGMSG_DEBUG("Enter newState");
+		if (newState)
+		{
+			LOGMSG_DEBUG("Enter newState");
+		}
+		CDC* pDC = GetDC();
+		if (pDC)
+		{
+			CRect rc;
+			GetClientRect(&rc);
+			CBrush brBkGnd;
+			brBkGnd.CreateSolidBrush(RGB(252, 255, 255));
+			int x = rc.Width() / 2 - 100;
+			int y = rc.Height() / 2;
+			pDC->FillRect(&rc, &brBkGnd);
+			pDC->TextOut(x, y, "Testing for this imager is done - please open and replace with next");
+			ReleaseDC(pDC);
+		}
+		return SetProgramState(eStateWaitForCameraLock);
+	}
+	else
+	{
+		return SetProgramState(eStateWaitForCameraLock); // back to beginning
 	}
 	return SetProgramState(eStateReportResults);}
 

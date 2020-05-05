@@ -1,3 +1,4 @@
+#include <afxwin.h>
 #include "MatlabTestCode.h"
 #include <iostream>
 #include <numeric> // for iota
@@ -29,11 +30,17 @@ bool MatlabTestCode::Initialize()
 	}
 	catch (matlab::cpplib::CppSharedLibException& e)
 	{
-		std::string s = e.what();
+		std::string s = "matlab::cpplib::CppSharedLibException in initMATLABLibrary: ";
+		s += e.what();
 		LOGMSG_ERROR(s.c_str());
+		AfxGetMainWnd()->SetWindowTextA(s.c_str());
+		MessageBeep(MB_ICONWARNING);
 	}
 	catch (const std::exception& exc) {
-		std::string s = exc.what();
+		std::string s = "std::exception in initMATLABLibrary: ";
+		s += exc.what();
+		AfxGetMainWnd()->SetWindowTextA(s.c_str());
+		MessageBeep(MB_ICONWARNING);
 		LOGMSG_ERROR(s.c_str());
 	}
 	return success;
@@ -84,33 +91,51 @@ bool MatlabTestCode::RunTestFullChartMTF50(std::vector<uint16_t>& image, int wid
 	}
 	catch (matlab::OutOfMemoryException& e)
 	{
-		std::string s = e.what();
+		std::string s = "matlab::OutOfMemoryException in fullChartMTF50: ";
+		s += e.what();
 		LOGMSG_ERROR(s.c_str());
+		AfxGetMainWnd()->SetWindowTextA(s.c_str());
+		MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::data::InvalidArrayTypeException& e)
 	{
-		std::string s = e.what();
+		std::string s = "matlab::data::InvalidArrayTypeException in fullChartMTF50: ";
+		s += e.what();
 		LOGMSG_ERROR(s.c_str());
+		AfxGetMainWnd()->SetWindowTextA(s.c_str());
+		MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::data::InvalidMemoryLayoutException& e)
 	{
-		std::string s = e.what();
+		std::string s = "matlab::data::InvalidMemoryLayoutException in fullChartMTF50: ";
+		s += e.what();
 		LOGMSG_ERROR(s.c_str());
+		AfxGetMainWnd()->SetWindowTextA(s.c_str());
+		MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::data::InvalidDimensionsInRowMajorArrayException& e)
 	{
-		std::string s = e.what();
+		std::string s = "matlab::data::InvalidDimensionsInRowMajorArrayException in fullChartMTF50: ";
+		s += e.what();
 		LOGMSG_ERROR(s.c_str());
+		AfxGetMainWnd()->SetWindowTextA(s.c_str());
+		MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::data::NumberOfElementsExceedsMaximumException& e)
 	{
-		std::string s = e.what();
+		std::string s = "matlab::data::NumberOfElementsExceedsMaximumException in fullChartMTF50: ";
+		s += e.what();
 		LOGMSG_ERROR(s.c_str());
+		AfxGetMainWnd()->SetWindowTextA(s.c_str());
+		MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::Exception& e)
 	{
-		std::string s = e.what();
+		std::string s = "matlab::Exception in fullChartMTF50: ";
+		s += e.what();
 		LOGMSG_ERROR(s.c_str());
+		AfxGetMainWnd()->SetWindowTextA(s.c_str());
+		MessageBeep(MB_ICONWARNING);
 	}
 	return success;
 }
@@ -163,33 +188,51 @@ bool MatlabTestCode::RunTestFullChartSNR(std::vector<uint16_t>& image, int width
 	}
 	catch (matlab::OutOfMemoryException& e)
 	{
-		std::string s = e.what();
+		std::string s = "matlab::OutOfMemoryException in fullChartSNR: ";
+		s += e.what();
 		LOGMSG_ERROR(s.c_str());
+		AfxGetMainWnd()->SetWindowTextA(s.c_str());
+		MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::data::InvalidArrayTypeException& e)
 	{
-		std::string s = e.what();
+		std::string s = "matlab::data::InvalidArrayTypeException in fullChartSNR: ";
+		s += e.what();
 		LOGMSG_ERROR(s.c_str());
+		AfxGetMainWnd()->SetWindowTextA(s.c_str());
+		MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::data::InvalidMemoryLayoutException& e)
 	{
-		std::string s = e.what();
+		std::string s = "matlab::data::InvalidMemoryLayoutException in fullChartSNR: ";
+		s += e.what();
 		LOGMSG_ERROR(s.c_str());
+		AfxGetMainWnd()->SetWindowTextA(s.c_str());
+		MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::data::InvalidDimensionsInRowMajorArrayException& e)
 	{
-		std::string s = e.what();
+		std::string s = "matlab::data::InvalidDimensionsInRowMajorArrayException in fullChartSNR: ";
+		s += e.what();
 		LOGMSG_ERROR(s.c_str());
+		AfxGetMainWnd()->SetWindowTextA(s.c_str());
+		MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::data::NumberOfElementsExceedsMaximumException& e)
 	{
-		std::string s = e.what();
+		std::string s = "matlab::data::NumberOfElementsExceedsMaximumException in fullChartSNR: ";
+		s += e.what();
 		LOGMSG_ERROR(s.c_str());
+		AfxGetMainWnd()->SetWindowTextA(s.c_str());
+		MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::Exception& e)
 	{
-		std::string s = e.what();
+		std::string s = "matlab::Exception in fullChartSNR: ";
+		s += e.what();
 		LOGMSG_ERROR(s.c_str());
+		AfxGetMainWnd()->SetWindowTextA(s.c_str());
+		MessageBeep(MB_ICONWARNING);
 	}
 	return success;
 }
@@ -235,33 +278,51 @@ bool MatlabTestCode::RunTestQuickMTF50(std::vector<uint8_t>& image, int width, i
 	}
 	catch (matlab::OutOfMemoryException& e)
 	{
-		std::string s = e.what();
+		std::string s = "matlab::OutOfMemoryException in quickMTF50: ";
+		s += e.what();
 		LOGMSG_ERROR(s.c_str());
+		AfxGetMainWnd()->SetWindowTextA(s.c_str());
+		MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::data::InvalidArrayTypeException& e)
 	{
-		std::string s = e.what();
+		std::string s = "matlab::data::InvalidArrayTypeException in quickMTF50: ";
+		s += e.what();
 		LOGMSG_ERROR(s.c_str());
+		AfxGetMainWnd()->SetWindowTextA(s.c_str());
+		MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::data::InvalidMemoryLayoutException& e)
 	{
-		std::string s = e.what();
+		std::string s = "matlab::data::InvalidMemoryLayoutException in quickMTF50: ";
+		s += e.what();
 		LOGMSG_ERROR(s.c_str());
+		AfxGetMainWnd()->SetWindowTextA(s.c_str());
+		MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::data::InvalidDimensionsInRowMajorArrayException& e)
 	{
-		std::string s = e.what();
+		std::string s = "matlab::data::InvalidDimensionsInRowMajorArrayException in quickMTF50: ";
+		s += e.what();
 		LOGMSG_ERROR(s.c_str());
+		AfxGetMainWnd()->SetWindowTextA(s.c_str());
+		MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::data::NumberOfElementsExceedsMaximumException& e)
 	{
-		std::string s = e.what();
+		std::string s = "matlab::data::NumberOfElementsExceedsMaximumException in quickMTF50: ";
+		s += e.what();
 		LOGMSG_ERROR(s.c_str());
+		AfxGetMainWnd()->SetWindowTextA(s.c_str());
+		MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::Exception& e)
 	{
-		std::string s = e.what();
+		std::string s = "matlab::Exception in quickMTF50: ";
+		s += e.what();
 		LOGMSG_ERROR(s.c_str());
+		AfxGetMainWnd()->SetWindowTextA(s.c_str());
+		MessageBeep(MB_ICONWARNING);
 	}
 	return success;
 }
