@@ -97,7 +97,6 @@ protected:
 	CWinThread* m_pTestingThread;
 	bool m_OperatorConsoleLockEngaged;
 	bool m_OperatorConsoleSwitchPressed;
-	bool m_DrawingPicture;
 	bool m_ProgramStateThreadRunning;
 	bool m_TestingThreadRunning;
 	bool m_ThreadShutdown;

@@ -74,7 +74,7 @@ COperatorConsole3View::COperatorConsole3View() noexcept :
 	m_ActiveTestRunning(false), m_SaveFrameCount(0), m_programState(eStateWaitForCameraLock),
 	m_pBitmapInfo(nullptr), m_sizeBitmapInfo(0), m_OperatorConsoleLockEngaged(false),
 	m_OperatorConsoleSwitchPressed(false), m_CameraRunning(false), m_ProgramStateThreadRunning(false),
-	m_ThreadShutdown(false), m_DrawingPicture(false), m_SaveEveryFrame8(false),
+	m_ThreadShutdown(false), m_SaveEveryFrame8(false),
 	m_SaveEveryFrame16(false), m_DrawRegistrationMarks(false), m_zoomDivision(1),
 	m_zoomMultiplier(1), m_shrinkDisplay(false), m_magnifyDisplay(false),
 	m_width(PICTURE_WIDTH), m_height(PICTURE_HEIGHT), m_maxPixelValueInSquare(0), m_FrameNumber(0),
@@ -299,7 +299,6 @@ void COperatorConsole3View::OnInitialUpdate()
 	m_ProgramStateThreadRunning = false;
 	m_TestingThreadRunning = false;
 	m_ThreadShutdown = false;
-	m_DrawingPicture = false;
 	m_ActiveTestRunning = false;
 	m_SaveFrameCount = 0;
 	m_programState = eStateWaitForCameraLock;
@@ -466,11 +465,10 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 		m_DrawFocusTestResults = false;
 		m_DrawFullChartMTF50 = false;
 		m_DrawFullChartSNR = false;
-		m_RunFocusTest = true;
+		m_RunFocusTest = false;
+		m_bRunTestQuickMTF50 = false;
+		m_bFullChartSNRDone = false;
 		m_CameraRunning = true;
-		m_DrawingPicture = true;
-		m_bRunTestQuickMTF50 = true;
-		m_bQuickMTF50Done = false;
 		HRESULT hr = m_vidCapture.StartVideoCapture();
 		if (SUCCEEDED(hr))
 		{
@@ -584,11 +582,12 @@ OperatorConsoleState COperatorConsole3View::HandleTesting1Camera(bool newState)
 			if (newState)
 			{
 				LOGMSG_DEBUG("Enter newState");
-				m_bRunTestQuickMTF50 = false;
 				m_DrawFocusTestResults = false;
 				m_DrawFullChartMTF50 = false;
 				m_DrawFullChartSNR = false;
 				m_RunFocusTest = false;
+				m_bRunTestQuickMTF50 = false;
+				m_bFullChartSNRDone = false;
 			}
 			// Draw video frame
 			ReadLock lock(m_pictureLock);
@@ -638,7 +637,7 @@ OperatorConsoleState COperatorConsole3View::HandleTesting2Camera(bool newState)
 			LOGMSG_DEBUG("Enter newState");
 			m_DrawFocusTestResults = false;
 			m_DrawFullChartMTF50 = false;
-			m_DrawFullChartSNR = true;
+			m_DrawFullChartSNR = false;
 			m_RunFocusTest = false;
 			m_bRunTestQuickMTF50 = false;
 			m_bFullChartSNRDone = false;
@@ -705,6 +704,12 @@ OperatorConsoleState COperatorConsole3View::HandleReportResults(bool newState)
 		if (newState)
 		{
 			LOGMSG_DEBUG("Enter newState");
+			m_DrawFocusTestResults = false;
+			m_DrawFullChartMTF50 = false;
+			m_DrawFullChartSNR = false;
+			m_RunFocusTest = false;
+			m_bRunTestQuickMTF50 = false;
+			m_bFullChartSNRDone = false;
 		}
 		bool frameValid = GetFrame(m_image8Data, m_image16Data);
 		if (frameValid)
