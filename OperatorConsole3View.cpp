@@ -706,18 +706,23 @@ OperatorConsoleState COperatorConsole3View::HandleReportResults(bool newState)
 		{
 			LOGMSG_DEBUG("Enter newState");
 		}
-		CDC* pDC = GetDC();
-		if (pDC)
+		bool frameValid = GetFrame(m_image8Data, m_image16Data);
+		if (frameValid)
 		{
-			CRect rc;
-			GetClientRect(&rc);
-			CBrush brBkGnd;
-			brBkGnd.CreateSolidBrush(RGB(252, 255, 255));
-			int x = rc.Width() / 2 - 100;
-			int y = rc.Height() / 2;
-			pDC->FillRect(&rc, &brBkGnd);
-			pDC->TextOut(x, y, "Testing for this imager is done - please open and replace with next");
-			ReleaseDC(pDC);
+			ReadLock lock(m_pictureLock);
+			CDC* pDC = GetDC();
+			if (pDC)
+			{
+				OnDraw(pDC);
+				CRect rc;
+				GetClientRect(&rc);
+				CBrush brBkGnd;
+				brBkGnd.CreateSolidBrush(RGB(252, 255, 255));
+				int x = rc.Width() / 2 - 100;
+				int y = rc.Height() / 2;
+				pDC->TextOut(x, y, "Testing for this imager is done - please open and replace with next");
+				ReleaseDC(pDC);
+			}
 		}
 		return SetProgramState(eStateReportResults);
 	}
