@@ -765,7 +765,7 @@ void COperatorConsole3View::WriteAttrib(CFile& file, std::string name, int value
 	file.Write(text, addComma);
 }
 
-void COperatorConsole3View::WriteAttrib(CFile& file, std::string name, std::string value, bool addComma = true)
+void COperatorConsole3View::WriteAttrib(CFile& file, std::string name, std::string value, bool addComma)
 {
 	CString text;
 	text.Format("\"%s\" : \"%s\"", name.c_str(), value.c_str());
