@@ -233,17 +233,9 @@ bool COperatorConsole3View::OpenJSON(CFile& file, CString filename)
 	SYSTEMTIME st;
 	GetLocalTime(&st);
 	CString sFilename;
-	sFilename.Format("%s-%s-%2d-%2d-%2d-%2d-%2d.json",
+	sFilename.Format("%s_%s_%d-%2d-%2d-%2d-%2d.json",
 		m_CameraID.c_str(), filename.GetString(), st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
-
-	int fileNum = 1;
-	while (PathFileExists(filename.GetString()))
-	{
-		fileNum++;
-		sFilename.Format("%s-%s-%2d-%2d-%2d-%2d-%2d-d.json",
-			m_CameraID.c_str(), filename.GetString(), st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, fileNum);
-	}
-	if (file.Open(filename, CFile::modeCreate | CFile::modeWrite))
+	if (file.Open(sFilename, CFile::modeCreate | CFile::modeWrite))
 	{
 		success = true;
 	}
@@ -727,7 +719,7 @@ OperatorConsoleState COperatorConsole3View::HandleReportResults(bool newState)
 			pDC->TextOut(x, y, "Testing for this imager is done - please open and replace with next");
 			ReleaseDC(pDC);
 		}
-		return SetProgramState(eStateWaitForCameraLock);
+		return SetProgramState(eStateReportResults);
 	}
 	else
 	{
@@ -740,39 +732,36 @@ void COperatorConsole3View::WriteString(CFile& file, CString text, bool addComma
 {
 	file.Write(text.GetString(), text.GetLength());
 	if (addComma)
-		file.Write("\n", 1);
+		file.Write(",", 1);
+	file.Write("\n", 1);
 }
 
 void COperatorConsole3View::WriteAttrib(CFile& file, std::string name, double value, bool inQuotes, bool addComma)
 {
 	CString text;
+	std::string formatString = "\"%s\" : %.1f";
 	if (inQuotes)
-		text.Format("\"%s\" : \"%.1f\"\n", name.c_str(), value);
-	else
-		text.Format("\"%s\" : %.1f\n", name.c_str(), value);
+		formatString = "\"%s\" : \"%.1f\"";
+	text.Format(formatString.c_str(), name.c_str(), value);
 
-	file.Write(text, addComma);
+	WriteString(file, text, addComma);
 }
 
 void COperatorConsole3View::WriteAttrib(CFile& file, std::string name, int value, bool inQuotes, bool addComma)
 {
 	CString text;
+	std::string formatString = "\"%s\" : %d";
 	if (inQuotes)
-		text.Format("\"%s\" : \"%.d\"\n", name.c_str(), value);
-	else
-		text.Format("\"%s\" : %d\n", name.c_str(), value);
-
-	file.Write(text, addComma);
+		formatString = "\"%s\" : \"%d\"";
+	text.Format(formatString.c_str(), name.c_str(), value);
+	WriteString(file, text, addComma);
 }
 
 void COperatorConsole3View::WriteAttrib(CFile& file, std::string name, std::string value, bool addComma)
 {
 	CString text;
 	text.Format("\"%s\" : \"%s\"", name.c_str(), value.c_str());
-	file.Write(text.GetString(), text.GetLength());
-	if (addComma)
-		file.Write(",", 1);
-	file.Write("\n", 1);
+	WriteString(file, text, addComma);
 }
 
 UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
@@ -811,14 +800,14 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 						if (pThis->OpenJSON(file, "FocusTest"))
 						{
 							pThis->WriteString(file, "{", false);
-							pThis->WriteAttrib(file, "CameraID", pThis->m_CameraID);
-							pThis->WriteAttrib(file, "FrameNum", pThis->m_FrameNumber);
+							pThis->WriteAttrib(file, "CameraID", pThis->m_CameraID, true);
+							pThis->WriteAttrib(file, "FrameNum", pThis->m_FrameNumber, true);
 							pThis->WriteString(file, "\"MFT50\" : [", false);
 							CString text;
 							for (auto i = pThis->m_outputQuickMTF50.begin(); i != pThis->m_outputQuickMTF50.end(); i++)
 							{
 								CString value;
-								value.Format("%.1", i->mtf50);
+								value.Format("%.1f", i->mtf50);
 								if (text.GetLength() > 0)
 									text += ",";
 								text += value;
@@ -826,7 +815,6 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 							file.Write(text.GetString(), text.GetLength());
 							pThis->WriteString(file, "]", false);
 							pThis->WriteString(file, "}", false);
-							file.Write("\n", 1);
 						}
 						pThis->m_bQuickMTF50Done = true;
 					}
@@ -855,18 +843,22 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 								pThis->WriteAttrib(file, "X", int(i->x), true, true);
 								pThis->WriteAttrib(file, "Y", int(i->y), true, true);
 								pThis->WriteAttrib(file, "MFTF50", i->mtf50, true, false);
-								if (index<lastIndex)
-									pThis->WriteString(file, "},", false);
-								else
-									pThis->WriteString(file, "}", false);
+								pThis->WriteString(file, "}", index < lastIndex); // add comma if not last item
 							}
-							pThis->WriteString(file, "]\n}", 3);
+							pThis->WriteString(file, "]", false);
+							pThis->WriteString(file, "}", false);
 							pThis->m_bRunTestFullChartMTF50 = false;
 						}
+						pThis->m_bFullChartMTF50Done = true;
+						pThis->m_bRunTestFullChartMTF50 = false;
+						LOGMSG_DEBUG("Turning off m_bRunTestFullChartMTF50 and turning on m_bFullChartMTF50Done");
 					}
-					pThis->m_bFullChartMTF50Done = true;
-					pThis->m_bRunTestFullChartMTF50 = false;
-					LOGMSG_DEBUG("Turning off m_bRunTestFullChartMTF50 and turning on m_bFullChartMTF50Done");
+					else
+					{
+						pThis->m_bFullChartMTF50Done = false;
+						pThis->m_bRunTestFullChartMTF50 = true;
+						LOGMSG_DEBUG("Error running RunTestFullChartMTF50 - will try to do again");
+					}
 				}
 				else if (pThis->m_bRunTestFullChartSNR)
 				{
@@ -886,25 +878,28 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 							int lastIndex = pThis->m_outputFullChartSNR.size();
 							for (auto i = pThis->m_outputFullChartSNR.begin(); i != pThis->m_outputFullChartSNR.end(); i++, index++)
 							{
-								pThis->WriteString(file, "{", false);
+								pThis->WriteString(file, "{", false); // no comma on start of struct item
 								pThis->WriteAttrib(file, "TestID", index, true, true);
 								pThis->WriteAttrib(file, "X", int(i->x), true, true);
 								pThis->WriteAttrib(file, "Y", int(i->y), true, true);
 								pThis->WriteAttrib(file, "meanIntensity", i->meanIntensity, true, true);
 								pThis->WriteAttrib(file, "RMSNoise", i->RMSNoise, true, true);
-								pThis->WriteAttrib(file, "SignalToNoise", i->SignalToNoise, true, false);
-								if (index < lastIndex)
-									pThis->WriteString(file, "},", false);
-								else
-									pThis->WriteString(file, "}", false);
+								pThis->WriteAttrib(file, "SignalToNoise", i->SignalToNoise, true, false); // last item in struct, no comma
+								pThis->WriteString(file, "}", index < lastIndex); // add comma if not last item
 							}
-							pThis->WriteString(file, "]\n}", 3);
+							pThis->WriteString(file, "]", false);
+							pThis->WriteString(file, "}", false);
 						}
 						pThis->m_bRunTestFullChartSNR = false;
+						pThis->m_bFullChartSNRDone = true;
+						LOGMSG_DEBUG("Turning off m_bRunTestFullChartSNR and turning on m_bRunTestFullChartSNR");
 					}
-					pThis->m_bFullChartSNRDone = true;
-					pThis->m_bRunTestFullChartSNR = false; // just run one time
-					LOGMSG_DEBUG("Turning off m_bRunTestFullChartSNR and turning on m_bRunTestFullChartSNR");
+					else
+					{
+						pThis->m_bRunTestFullChartSNR = true;
+						pThis->m_bFullChartSNRDone = false;
+						LOGMSG_DEBUG("Error running RunTestFullChartSNR");
+					}
 				}
 				else
 				{
