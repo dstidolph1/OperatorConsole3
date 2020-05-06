@@ -227,25 +227,25 @@ void COperatorConsole3View::OnDraw(CDC* pDC)
 	}
 }
 
-bool COperatorConsole3View::OpenCSV(CFile& file, CString filename, CString headers)
+bool COperatorConsole3View::OpenJSON(CFile& file, CString filename)
 {
 	bool success = false;
-	if (PathFileExists(filename.GetString()))
+	SYSTEMTIME st;
+	GetLocalTime(&st);
+	CString sFilename;
+	sFilename.Format("%s-%s-%2d-%2d-%2d-%2d-%2d.json",
+		m_CameraID.c_str(), filename.GetString(), st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+
+	int fileNum = 1;
+	while (PathFileExists(filename.GetString()))
 	{
-		if (file.Open(filename, CFile::modeCreate | CFile::modeNoTruncate | CFile::modeWrite))
-		{
-			file.SeekToEnd();
-			success = true;
-		}
+		fileNum++;
+		sFilename.Format("%s-%s-%2d-%2d-%2d-%2d-%2d-d.json",
+			m_CameraID.c_str(), filename.GetString(), st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, fileNum);
 	}
-	else // File does NOT exist, so we have to open and write headers
+	if (file.Open(filename, CFile::modeCreate | CFile::modeWrite))
 	{
-		if (file.Open(filename, CFile::modeCreate | CFile::modeWrite))
-		{
-			file.Write(headers, headers.GetLength());
-			file.Write("\n", 1);
-			success = true;
-		}
+		success = true;
 	}
 	return success;
 }
@@ -733,7 +733,47 @@ OperatorConsoleState COperatorConsole3View::HandleReportResults(bool newState)
 	{
 		return SetProgramState(eStateWaitForCameraLock); // back to beginning
 	}
-	return SetProgramState(eStateReportResults);}
+	return SetProgramState(eStateReportResults);
+}
+
+void COperatorConsole3View::WriteString(CFile& file, CString text, bool addComma)
+{
+	file.Write(text.GetString(), text.GetLength());
+	if (addComma)
+		file.Write("\n", 1);
+}
+
+void COperatorConsole3View::WriteAttrib(CFile& file, std::string name, double value, bool inQuotes, bool addComma)
+{
+	CString text;
+	if (inQuotes)
+		text.Format("\"%s\" : \"%.1f\"\n", name.c_str(), value);
+	else
+		text.Format("\"%s\" : %.1f\n", name.c_str(), value);
+
+	file.Write(text, addComma);
+}
+
+void COperatorConsole3View::WriteAttrib(CFile& file, std::string name, int value, bool inQuotes, bool addComma)
+{
+	CString text;
+	if (inQuotes)
+		text.Format("\"%s\" : \"%.d\"\n", name.c_str(), value);
+	else
+		text.Format("\"%s\" : %d\n", name.c_str(), value);
+
+	file.Write(text, addComma);
+}
+
+void COperatorConsole3View::WriteAttrib(CFile& file, std::string name, std::string value, bool addComma = true)
+{
+	CString text;
+	text.Format("\"%s\" : \"%s\"", name.c_str(), value.c_str());
+	file.Write(text.GetString(), text.GetLength());
+	if (addComma)
+		file.Write(",", 1);
+	file.Write("\n", 1);
+}
 
 UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 {
@@ -766,21 +806,30 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 					pThis->m_bQuickMTF50Done = false;
 					pThis->m_DrawFocusTestResults = pThis->m_matlabTestCode.RunTestQuickMTF50(pThis->m_image8DataTesting, pThis->m_width, pThis->m_height, pThis->registrationCoordinates, pThis->m_outputQuickMTF50);
 					LOGMSG_DEBUG("After RunTestQuickMTF50 - " + std::to_string(pThis->m_DrawFocusTestResults));
-					if (pThis->m_DrawFocusTestResults &&
-						pThis->OpenCSV(file, "FocusTest.csv", "CameraID,FrameNum,MTF50-1,MTF50-2,MTF50-3,MTF50-4,MTF50-5"))
+					if (pThis->m_DrawFocusTestResults)
 					{
-						CString sText;
-						sText.Format("%s,%d", pThis->m_CameraID.c_str(), pThis->m_FrameNumber);
-						file.Write(sText.GetString(), sText.GetLength());
-						for (auto i = pThis->m_outputQuickMTF50.begin(); i != pThis->m_outputQuickMTF50.end(); i++)
+						if (pThis->OpenJSON(file, "FocusTest"))
 						{
-							file.Write(",", 1);
-							std::string text = std::to_string(i->mtf50);
-							file.Write(text.c_str(), UINT(text.length()));
+							pThis->WriteString(file, "{", false);
+							pThis->WriteAttrib(file, "CameraID", pThis->m_CameraID);
+							pThis->WriteAttrib(file, "FrameNum", pThis->m_FrameNumber);
+							pThis->WriteString(file, "\"MFT50\" : [", false);
+							CString text;
+							for (auto i = pThis->m_outputQuickMTF50.begin(); i != pThis->m_outputQuickMTF50.end(); i++)
+							{
+								CString value;
+								value.Format("%.1", i->mtf50);
+								if (text.GetLength() > 0)
+									text += ",";
+								text += value;
+							}
+							file.Write(text.GetString(), text.GetLength());
+							pThis->WriteString(file, "]", false);
+							pThis->WriteString(file, "}", false);
+							file.Write("\n", 1);
 						}
-						file.Write("\n", 1);
+						pThis->m_bQuickMTF50Done = true;
 					}
-					pThis->m_bQuickMTF50Done = true;
 					LOGMSG_DEBUG("Turning on m_bQuickMTF50Done");
 				}
 				else if (pThis->m_bRunTestFullChartMTF50)
@@ -791,29 +840,27 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 					LOGMSG_DEBUG("After RunTestFullChartMTF50 - " + std::to_string(pThis->m_DrawFullChartMTF50));
 					if (pThis->m_DrawFullChartMTF50)
 					{
-						std::string header = "CameraID,FrameNum";
-						for (size_t i = 0; i < pThis->m_outputFullChartMTF50.size(); i++)
+						if (pThis->OpenJSON(file, "FullChartMTF50"))
 						{
-							header += ",x-" + std::to_string(i) + ",y-" + std::to_string(i) + ",MFT50-" + std::to_string(i);
-						}
-						if (pThis->OpenCSV(file, "FullChartMTF50.csv", header.c_str()))
-						{
-							CString sText;
-							sText.Format("%s,%d", pThis->m_CameraID.c_str(), pThis->m_FrameNumber);
-							file.Write(sText.GetString(), sText.GetLength());
-							for (auto i = pThis->m_outputFullChartMTF50.begin(); i != pThis->m_outputFullChartMTF50.end(); i++)
+							pThis->WriteString(file, "{", false);
+							pThis->WriteAttrib(file, "CameraID", pThis->m_CameraID);
+							pThis->WriteAttrib(file, "FrameNum", pThis->m_FrameNumber);
+							pThis->WriteString(file, "\"Tests\" : [", false);
+							int index = 1;
+							int lastIndex = pThis->m_outputFullChartMTF50.size();
+							for (auto i = pThis->m_outputFullChartMTF50.begin(); i != pThis->m_outputFullChartMTF50.end(); i++, index++)
 							{
-								std::string text = std::to_string(i->x);
-								file.Write(",", 1);
-								file.Write(text.c_str(), UINT(text.length()));
-								text = std::to_string(i->y);
-								file.Write(",", 1);
-								file.Write(text.c_str(), UINT(text.length()));
-								text = std::to_string(i->mtf50);
-								file.Write(",", 1);
-								file.Write(text.c_str(), UINT(text.length()));
+								pThis->WriteString(file, "{", false);
+								pThis->WriteAttrib(file, "TestID", index, true, true);
+								pThis->WriteAttrib(file, "X", int(i->x), true, true);
+								pThis->WriteAttrib(file, "Y", int(i->y), true, true);
+								pThis->WriteAttrib(file, "MFTF50", i->mtf50, true, false);
+								if (index<lastIndex)
+									pThis->WriteString(file, "},", false);
+								else
+									pThis->WriteString(file, "}", false);
 							}
-							file.Write("\n", 1);
+							pThis->WriteString(file, "]\n}", 3);
 							pThis->m_bRunTestFullChartMTF50 = false;
 						}
 					}
@@ -829,37 +876,29 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 					LOGMSG_DEBUG("After RunTestFullChartSNR - " + std::to_string(pThis->m_DrawFullChartSNR));
 					if (pThis->m_DrawFullChartSNR)
 					{
-						std::string header = "CameraID,FrameNum";
-						for (size_t i = 0; i < pThis->m_outputFullChartSNR.size(); i++)
+						if (pThis->OpenJSON(file, "FullChartSNR"))
 						{
-							header += ",X-" + std::to_string(i);
-							header += ",Y-" + std::to_string(i);
-							header += ",MeanIntensity-" + std::to_string(i);
-							header += ",RMSNoise-" + std::to_string(i);
-							header += ",SignalToNoise-" + std::to_string(i);
-						}
-						if (pThis->OpenCSV(file, "FullChartSNR.csv", header.c_str()))
-						{
-							CString sText;
-							sText.Format("%s,%d", pThis->m_CameraID.c_str(), pThis->m_FrameNumber);
-							file.Write(sText.GetString(), sText.GetLength());
-							for (auto i = pThis->m_outputFullChartSNR.begin(); i != pThis->m_outputFullChartSNR.end(); i++)
+							pThis->WriteString(file, "{", false);
+							pThis->WriteAttrib(file, "CameraID", pThis->m_CameraID);
+							pThis->WriteAttrib(file, "FrameNum", pThis->m_FrameNumber);
+							pThis->WriteString(file, "\"Tests\" : [", false);
+							int index = 1;
+							int lastIndex = pThis->m_outputFullChartSNR.size();
+							for (auto i = pThis->m_outputFullChartSNR.begin(); i != pThis->m_outputFullChartSNR.end(); i++, index++)
 							{
-								file.Write(",", 1);
-								std::string text = std::to_string(i->x);
-								file.Write(text.c_str(), UINT(text.length()));
-								file.Write(",", 1);
-								text = std::to_string(i->y);
-								text = std::to_string(i->meanIntensity);
-								file.Write(text.c_str(), UINT(text.length()));
-								file.Write(",", 1);
-								text = std::to_string(i->RMSNoise);
-								file.Write(text.c_str(), UINT(text.length()));
-								file.Write(",", 1);
-								text = std::to_string(i->SignalToNoise);
-								file.Write(text.c_str(), UINT(text.length()));
+								pThis->WriteString(file, "{", false);
+								pThis->WriteAttrib(file, "TestID", index, true, true);
+								pThis->WriteAttrib(file, "X", int(i->x), true, true);
+								pThis->WriteAttrib(file, "Y", int(i->y), true, true);
+								pThis->WriteAttrib(file, "meanIntensity", i->meanIntensity, true, true);
+								pThis->WriteAttrib(file, "RMSNoise", i->RMSNoise, true, true);
+								pThis->WriteAttrib(file, "SignalToNoise", i->SignalToNoise, true, false);
+								if (index < lastIndex)
+									pThis->WriteString(file, "},", false);
+								else
+									pThis->WriteString(file, "}", false);
 							}
-							file.Write("\n", 1);
+							pThis->WriteString(file, "]\n}", 3);
 						}
 						pThis->m_bRunTestFullChartSNR = false;
 					}

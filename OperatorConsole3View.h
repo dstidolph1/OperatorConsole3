@@ -51,7 +51,11 @@ public:
 	bool SwitchPressed();
 
 protected:
-	bool OpenCSV(CFile& file, CString filename, CString headers);
+	bool OpenJSON(CFile& file, CString testName);
+	void WriteString(CFile& file, CString text, bool addComma = true);
+	void WriteAttrib(CFile& file, std::string name, std::string value, bool addComma = true);
+	void WriteAttrib(CFile &file, std::string name, double value, bool inQuotes = true, bool addComma = true);
+	void WriteAttrib(CFile& file, std::string name, int value, bool inQuotes = true, bool addComma = true);
 	bool GetFrame(std::vector<uint8_t>& image8Data, std::vector<uint16_t>& image16Data);
 	void DisplayFocusResult(CDC *pDC, int x, int y, double value);
 	CStringW UTF8toUTF16(const CStringA& utf8);
