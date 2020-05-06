@@ -174,7 +174,7 @@ void COperatorConsole3View::OnDraw(CDC* pDC)
 		pDC->SelectObject(originalPen);
 		pDC->SelectObject(originalBrush);
 	}
-	if (m_DrawFocusTestResults)
+	if (m_DrawFocusTestResults && !m_outputQuickMTF50.empty())
 	{
 		if (m_shrinkDisplay)
 		{
@@ -201,22 +201,20 @@ void COperatorConsole3View::OnDraw(CDC* pDC)
 			DisplayFocusResult(pDC, 1180, 1450, m_outputQuickMTF50[4].mtf50);
 		}
 	}
-	else if (m_DrawFullChartMTF50)
+	else if (m_DrawFullChartMTF50 && !m_outputFullChartMTF50.empty())
 	{
 		for (auto i = m_outputFullChartMTF50.begin(); i != m_outputFullChartMTF50.end(); i++)
 		{
 			DisplayFocusResult(pDC, int(i->x), int(i->y), i->mtf50);
 		}
 	}
-	else if (m_DrawFullChartSNR)
+	else if (m_DrawFullChartSNR && !m_outputFullChartSNR.empty())
 	{
 		size_t index = 0;
 		for (auto i = m_outputFullChartSNR.begin(); i != m_outputFullChartSNR.end(); i++)
 		{
 			if (index < m_GreyBoxes.size())
 			{
-				int x = m_GreyBoxes[index].x;
-				int y = m_GreyBoxes[index].y;
 				DisplayFocusResult(pDC, int(i->x), int(i->y), double(index));
 				DisplayFocusResult(pDC, int(i->x), int(i->y) + 10, i->meanIntensity);
 				DisplayFocusResult(pDC, int(i->x), int(i->y) + 20, i->RMSNoise);
@@ -462,11 +460,11 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 	if (newState)
 	{
 		LOGMSG_DEBUG("Enter newState");
-		m_DrawFocusTestResults = false;
+		m_DrawFocusTestResults = true;
 		m_DrawFullChartMTF50 = false;
 		m_DrawFullChartSNR = false;
-		m_RunFocusTest = false;
-		m_bRunTestQuickMTF50 = false;
+		m_RunFocusTest = true;
+		m_bRunTestQuickMTF50 = true;
 		m_bFullChartSNRDone = false;
 		m_CameraRunning = true;
 		HRESULT hr = m_vidCapture.StartVideoCapture();
@@ -490,56 +488,22 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 		{
 			if (GetFrame(m_image8Data, m_image16Data))
 			{
-				if (m_maxPixelValueInSquare > 0)
+				ReadLock lock(m_pictureLock);
+				CDC* pDC = GetDC();
+				OnDraw(pDC);
+				ReleaseDC(pDC);
+				if (!m_ActiveTestRunning)
 				{
-					ReadLock lock(m_pictureLock);
-					CDC* pDC = GetDC();
-					OnDraw(pDC);
-					ReleaseDC(pDC);
-					if (!m_ActiveTestRunning && m_bRunTestQuickMTF50)
-					{
-						m_ActiveTestRunning = true;
-						//memcpy(&m_image8DataTesting[0], &m_image8Data[0], m_image8Data.size()); // Copy to backup which will be tested
-						LOGMSG_DEBUG("Copying m_image8Data to m_image8DataTesting for focus testing");
-						memcpy(&m_image8DataTesting[0], &m_image8Data[0], m_image8Data.size()); // Copy to backup which will be tested
-						LOGMSG_DEBUG("Setting TestEvent");
-						m_MatlabImageTestReadyEvent.SetEvent();
-					}
+					m_ActiveTestRunning = true;
+					//memcpy(&m_image8DataTesting[0], &m_image8Data[0], m_image8Data.size()); // Copy to backup which will be tested
+					LOGMSG_DEBUG("Copying m_image8Data to m_image8DataTesting for focus testing");
+					memcpy(&m_image8DataTesting[0], &m_image8Data[0], m_image8Data.size()); // Copy to backup which will be tested
+					LOGMSG_DEBUG("Setting TestEvent");
+					m_RunFocusTest = true;
+					m_DrawFocusTestResults = true;
+					m_MatlabImageTestReadyEvent.SetEvent();
 				}
-				if (m_SaveEveryFrame8 && (m_SaveFrameCount < m_MaxSaveFrames))
-				{
-					WriteLock lock(m_pictureLock);
-					CString filename;
-					filename.Format("%s\\%sFrame-%04d.bmp", m_PictureSavingFolder.GetBuffer(), m_PictureBaseName.GetBuffer(), m_FrameNumber);
-					SaveImage8ToFile(filename);
-					m_SaveFrameCount++;
-					if (m_SaveFrameCount >= m_MaxSaveFrames)
-					{
-						m_SaveEveryFrame8 = false;
-						CMenu* pMenu = GetParentMenu();
-						if (pMenu)
-							pMenu->CheckMenuItem(ID_CAMERA_SAVESEQUENCETODISK, MF_UNCHECKED | MF_BYCOMMAND);
-
-					}
-				}
-				if (m_SaveEveryFrame16 && (m_SaveFrameCount < m_MaxSaveFrames))
-				{
-					WriteLock lock(m_pictureLock);
-					CStringW filename;
-					CStringW folder = UTF8toUTF16(m_PictureSavingFolder);
-					CStringW baseName = UTF8toUTF16(m_PictureBaseName);
-					filename.Format(L"%s\\%sFrame-%04d.tif", folder.GetBuffer(), baseName.GetBuffer(), m_FrameNumber);
-					SaveImage16ToFile(filename);
-					m_SaveFrameCount++;
-					if (m_SaveFrameCount >= m_MaxSaveFrames)
-					{
-						m_SaveEveryFrame16 = false;
-						CMenu* pMenu = GetParentMenu();
-						if (pMenu)
-							pMenu->CheckMenuItem(ID_CAMERA_SAVESEQUENCETODISK, MF_UNCHECKED | MF_BYCOMMAND);
-
-					}
-				}
+				CheckIfSaveFrames();
 			}
 			if (SwitchPressed())
 			{
@@ -555,6 +519,44 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 	else
 	{
 		return SetProgramState(eStateWaitForCameraLock);
+	}
+}
+
+void COperatorConsole3View::CheckIfSaveFrames()
+{
+	if (m_SaveEveryFrame8 && (m_SaveFrameCount < m_MaxSaveFrames))
+	{
+		WriteLock lock(m_pictureLock);
+		CString filename;
+		filename.Format("%s\\%sFrame-%04d.bmp", m_PictureSavingFolder.GetBuffer(), m_PictureBaseName.GetBuffer(), m_FrameNumber);
+		SaveImage8ToFile(filename);
+		m_SaveFrameCount++;
+		if (m_SaveFrameCount >= m_MaxSaveFrames)
+		{
+			m_SaveEveryFrame8 = false;
+			CMenu* pMenu = GetParentMenu();
+			if (pMenu)
+				pMenu->CheckMenuItem(ID_CAMERA_SAVESEQUENCETODISK, MF_UNCHECKED | MF_BYCOMMAND);
+
+		}
+	}
+	if (m_SaveEveryFrame16 && (m_SaveFrameCount < m_MaxSaveFrames))
+	{
+		WriteLock lock(m_pictureLock);
+		CStringW filename;
+		CStringW folder = UTF8toUTF16(m_PictureSavingFolder);
+		CStringW baseName = UTF8toUTF16(m_PictureBaseName);
+		filename.Format(L"%s\\%sFrame-%04d.tif", folder.GetBuffer(), baseName.GetBuffer(), m_FrameNumber);
+		SaveImage16ToFile(filename);
+		m_SaveFrameCount++;
+		if (m_SaveFrameCount >= m_MaxSaveFrames)
+		{
+			m_SaveEveryFrame16 = false;
+			CMenu* pMenu = GetParentMenu();
+			if (pMenu)
+				pMenu->CheckMenuItem(ID_CAMERA_SAVESEQUENCETODISK, MF_UNCHECKED | MF_BYCOMMAND);
+
+		}
 	}
 }
 
@@ -594,6 +596,7 @@ OperatorConsoleState COperatorConsole3View::HandleTesting1Camera(bool newState)
 			CDC* pDC = GetDC();
 			OnDraw(pDC);
 			ReleaseDC(pDC);
+			CheckIfSaveFrames();
 
 			if (newState)
 			{
@@ -656,6 +659,8 @@ OperatorConsoleState COperatorConsole3View::HandleTesting2Camera(bool newState)
 			CDC* pDC = GetDC();
 			OnDraw(pDC);
 			ReleaseDC(pDC);
+			CheckIfSaveFrames();
+
 			if (makingAverage)
 			{
 				imageCount++;
@@ -690,11 +695,7 @@ OperatorConsoleState COperatorConsole3View::HandleTesting2Camera(bool newState)
 		}
 		return SetProgramState(eStateTesting2Camera);
 	}
-	else
-	{
-		return SetProgramState(eStateWaitForCameraLock); // back to beginning
-	}
-	return SetProgramState(eStateWaitForCameraLock);
+	return SetProgramState(eStateWaitForCameraLock); // back to beginning
 }
 
 OperatorConsoleState COperatorConsole3View::HandleReportResults(bool newState)
@@ -727,15 +728,12 @@ OperatorConsoleState COperatorConsole3View::HandleReportResults(bool newState)
 				int y = rc.Height() / 2;
 				pDC->TextOut(x, y, "Testing for this imager is done - please open and replace with next");
 				ReleaseDC(pDC);
+				CheckIfSaveFrames();
 			}
 		}
 		return SetProgramState(eStateReportResults);
 	}
-	else
-	{
-		return SetProgramState(eStateWaitForCameraLock); // back to beginning
-	}
-	return SetProgramState(eStateReportResults);
+	return SetProgramState(eStateWaitForCameraLock); // back to beginning
 }
 
 void COperatorConsole3View::WriteString(CFile& file, CString text, bool addComma)
@@ -845,7 +843,7 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 							pThis->WriteAttrib(file, "FrameNum", pThis->m_FrameNumber);
 							pThis->WriteString(file, "\"Tests\" : [", false);
 							int index = 1;
-							int lastIndex = pThis->m_outputFullChartMTF50.size();
+							int lastIndex = int(pThis->m_outputFullChartMTF50.size());
 							for (auto i = pThis->m_outputFullChartMTF50.begin(); i != pThis->m_outputFullChartMTF50.end(); i++, index++)
 							{
 								pThis->WriteString(file, "{", false);
@@ -885,7 +883,7 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 							pThis->WriteAttrib(file, "FrameNum", pThis->m_FrameNumber);
 							pThis->WriteString(file, "\"Tests\" : [", false);
 							int index = 1;
-							int lastIndex = pThis->m_outputFullChartSNR.size();
+							int lastIndex = int(pThis->m_outputFullChartSNR.size());
 							for (auto i = pThis->m_outputFullChartSNR.begin(); i != pThis->m_outputFullChartSNR.end(); i++, index++)
 							{
 								pThis->WriteString(file, "{", false); // no comma on start of struct item

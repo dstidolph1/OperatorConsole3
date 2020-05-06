@@ -51,6 +51,7 @@ public:
 	bool SwitchPressed();
 
 protected:
+	void CheckIfSaveFrames();
 	bool OpenJSON(CFile& file, CString testName);
 	void WriteString(CFile& file, CString text, bool addComma = true);
 	void WriteAttrib(CFile& file, std::string name, std::string value, bool addComma = true);

@@ -147,10 +147,11 @@ HRESULT VideoCapture::GetCameraFrame(std::vector<uint8_t>& image8Data, std::vect
 			image8Data.resize(length);
 		auto iSrc = image10Data.begin();
 		auto iDest8 = image8Data.begin();
-		for (int y = 0; y < gHeight; y++)
+		CPoint pt(0,0);
+		for (int y = 0; y < gHeight; y++,pt.y++)
 		{
-			bool inRectRows = (y >= rcMaxValue.top) && (y <= rcMaxValue.bottom);
-			for (int x = 0; x < gWidth; x++)
+			pt.x = 0;
+			for (int x = 0; x < gWidth; x++,pt.x++)
 			{
 				switch (m_BitShift)
 				{
@@ -172,13 +173,10 @@ HRESULT VideoCapture::GetCameraFrame(std::vector<uint8_t>& image8Data, std::vect
 					*iDest8 = 0xff & (*iSrc >> 2);
 					break;
 				}
-				if (inRectRows)
+				if (rcMaxValue.PtInRect(pt))
 				{
-					if ((x >= rcMaxValue.left) && (x <= rcMaxValue.right))
-					{
-						if (*iDest8 > maxPixelValue)
-							maxPixelValue = *iDest8;
-					}
+					if (*iDest8 > maxPixelValue)
+						maxPixelValue = *iDest8;
 				}
 				//*iSrc = *iSrc << 6;
 				iDest8++;
