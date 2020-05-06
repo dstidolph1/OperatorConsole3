@@ -114,8 +114,9 @@ BOOL COperatorConsole3View::PreCreateWindow(CREATESTRUCT& cs)
 
 void COperatorConsole3View::DisplayFocusResult(CDC* pDC, int x, int y, double value)
 {
-	CString sValue(std::to_string(value).c_str());
-	pDC->TextOut(x, y, sValue);
+	CString sValue;
+	sValue.Format("%.1f",value);
+	pDC->TextOut(x, y, sValue.GetString());
 }
 
 void COperatorConsole3View::DrawRegistrationPoint(CDC *pDC, int x, int y)
@@ -160,8 +161,10 @@ void COperatorConsole3View::OnDraw(CDC* pDC)
 	}
 	// Setting the StretchBltMode to COLORONCOLOR eliminates the horrible dithering for grayscale images.
 	SetStretchBltMode(pDC->GetSafeHdc(), COLORONCOLOR);
-	::StretchDIBits(pDC->GetSafeHdc(), 0, 0, width, height, 0, 0, m_width, m_height, LPVOID(&m_image8Data[0]), m_pBitmapInfo, DIB_RGB_COLORS, SRCCOPY);
-
+	{
+		ReadLock lock(m_pictureLock);
+		::StretchDIBits(pDC->GetSafeHdc(), 0, 0, width, height, 0, 0, m_width, m_height, LPVOID(&m_image8Data[0]), m_pBitmapInfo, DIB_RGB_COLORS, SRCCOPY);
+	}
 	if (m_DrawRegistrationMarks)
 	{
 		HGDIOBJ originalPen = pDC->SelectObject(GetStockObject(DC_PEN));
@@ -231,7 +234,7 @@ bool COperatorConsole3View::OpenJSON(CFile& file, CString filename)
 	SYSTEMTIME st;
 	GetLocalTime(&st);
 	CString sFilename;
-	sFilename.Format("%s_%s_%d-%2d-%2d-%2d-%2d.json",
+	sFilename.Format("%s_%s_%d-%02d-%02d-%02d-%02d.json",
 		m_CameraID.c_str(), filename.GetString(), st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
 	if (file.Open(sFilename, CFile::modeCreate | CFile::modeWrite))
 	{
@@ -488,7 +491,6 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 		{
 			if (GetFrame(m_image8Data, m_image16Data))
 			{
-				ReadLock lock(m_pictureLock);
 				CDC* pDC = GetDC();
 				OnDraw(pDC);
 				ReleaseDC(pDC);
@@ -497,8 +499,9 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 					m_ActiveTestRunning = true;
 					//memcpy(&m_image8DataTesting[0], &m_image8Data[0], m_image8Data.size()); // Copy to backup which will be tested
 					LOGMSG_DEBUG("Copying m_image8Data to m_image8DataTesting for focus testing");
+					ReadLock lock(m_pictureLock);
 					memcpy(&m_image8DataTesting[0], &m_image8Data[0], m_image8Data.size()); // Copy to backup which will be tested
-					LOGMSG_DEBUG("Setting TestEvent");
+					LOGMSG_DEBUG("Setting TestEvent for focus testing");
 					m_RunFocusTest = true;
 					m_DrawFocusTestResults = true;
 					m_MatlabImageTestReadyEvent.SetEvent();
@@ -526,7 +529,6 @@ void COperatorConsole3View::CheckIfSaveFrames()
 {
 	if (m_SaveEveryFrame8 && (m_SaveFrameCount < m_MaxSaveFrames))
 	{
-		WriteLock lock(m_pictureLock);
 		CString filename;
 		filename.Format("%s\\%sFrame-%04d.bmp", m_PictureSavingFolder.GetBuffer(), m_PictureBaseName.GetBuffer(), m_FrameNumber);
 		SaveImage8ToFile(filename);
@@ -542,7 +544,6 @@ void COperatorConsole3View::CheckIfSaveFrames()
 	}
 	if (m_SaveEveryFrame16 && (m_SaveFrameCount < m_MaxSaveFrames))
 	{
-		WriteLock lock(m_pictureLock);
 		CStringW filename;
 		CStringW folder = UTF8toUTF16(m_PictureSavingFolder);
 		CStringW baseName = UTF8toUTF16(m_PictureBaseName);
@@ -592,7 +593,6 @@ OperatorConsoleState COperatorConsole3View::HandleTesting1Camera(bool newState)
 				m_bFullChartSNRDone = false;
 			}
 			// Draw video frame
-			ReadLock lock(m_pictureLock);
 			CDC* pDC = GetDC();
 			OnDraw(pDC);
 			ReleaseDC(pDC);
@@ -655,7 +655,6 @@ OperatorConsoleState COperatorConsole3View::HandleTesting2Camera(bool newState)
 		bool frameValid = GetFrame(m_image8Data, m_image16Data);
 		if (frameValid)
 		{
-			ReadLock lock(m_pictureLock);
 			CDC* pDC = GetDC();
 			OnDraw(pDC);
 			ReleaseDC(pDC);
@@ -715,7 +714,6 @@ OperatorConsoleState COperatorConsole3View::HandleReportResults(bool newState)
 		bool frameValid = GetFrame(m_image8Data, m_image16Data);
 		if (frameValid)
 		{
-			ReadLock lock(m_pictureLock);
 			CDC* pDC = GetDC();
 			if (pDC)
 			{
@@ -1108,7 +1106,7 @@ void COperatorConsole3View::SaveImage8ToFile(const char* filename)
 				ReadLock lock(m_pictureLock);
 				UINT cbSize = UINT(m_image8Data.size());
 				file.Write((LPVOID)&m_image8Data[0], cbSize);
-}
+			}
 			file.Close();
 		}
 	}
@@ -1233,7 +1231,6 @@ void COperatorConsole3View::OnCameraSaveSingleImageToDisk()
 	FileDlg.m_ofn.lpstrInitialDir = m_PictureSavingFolder;
 	if (FileDlg.DoModal() == IDOK)
 	{
-		WriteLock lock(m_pictureLock);
 		m_PictureSavingFolder = FileDlg.GetFolderPath();
 		CString filename = FileDlg.GetPathName();
 		SaveImage8ToFile(filename);
@@ -1456,7 +1453,6 @@ void COperatorConsole3View::OnCameraSaveSingle10BitImageToTiffFile()
 	FileDlg.m_ofn.lpstrInitialDir = m_PictureSavingFolder;
 	if (FileDlg.DoModal() == IDOK)
 	{
-		WriteLock lock(m_pictureLock);
 		m_PictureSavingFolder = FileDlg.GetFolderPath();
 		CStringW filename = UTF8toUTF16(FileDlg.GetPathName());
 		SaveImage16ToFile(filename);
