@@ -599,9 +599,16 @@ HRESULT VideoCapture::sgGetSampleGrabberMediaType(ISampleGrabber * pGrab)
     }
 
     VIDEOINFOHEADER *pVih = (VIDEOINFOHEADER *)mt.pbFormat;
-    gWidth = pVih->bmiHeader.biWidth;
-    gHeight = pVih->bmiHeader.biHeight;
-
+	if (pVih)
+	{
+		gWidth = pVih->bmiHeader.biWidth;
+		gHeight = pVih->bmiHeader.biHeight;
+	}
+	else
+	{
+		gWidth = PICTURE_WIDTH;
+		gHeight = PICTURE_HEIGHT;
+	}
 	printf("gWidth....%d\n", gWidth);
 	printf("gHeight....%d\n", gHeight);
 

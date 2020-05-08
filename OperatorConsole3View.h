@@ -51,7 +51,7 @@ public:
 	bool SwitchPressed();
 
 protected:
-	void CheckIfSaveFrames();
+	void CheckIfSaveFrames(std::vector<uint8_t> &image8, std::vector<uint16_t> &image16);
 	bool OpenJSON(CFile& file, CString testName);
 	void WriteString(CFile& file, CString text, bool addComma = true);
 	void WriteAttrib(CFile& file, std::string name, std::string value, bool addComma = true);
@@ -63,8 +63,8 @@ protected:
 	void DrawRegistrationPoint(CDC* pDC, int x, int y);
 	void InitPictureData();
 	bool LoadImage8ToFile(const char* filename);
-	void SaveImage8ToFile(const char* filename);
-	void SaveImage16ToFile(const wchar_t* filename);
+	void SaveImage8ToFile(const char* filename, std::vector<uint8_t>& image8);
+	void SaveImage16ToFile(const wchar_t* filename, const std::vector<uint16_t> &image);
 	virtual void OnInitialUpdate(); // called first time after construct
 	static UINT __cdecl ThreadProc(LPVOID pParam);
 	static UINT __cdecl AnalyzeFrameThreadProc(LPVOID pParam);
@@ -76,6 +76,7 @@ protected:
 	CMenu* GetParentMenu();
 	void SetStatusBarText(CString text);
 	OperatorConsoleState SetProgramState(OperatorConsoleState state);
+	std::wstring GetImagePath(const wchar_t* testName);
 
 // Implementation
 public:

@@ -401,7 +401,7 @@ bool COperatorConsole3View::SwitchPressed()
 #else
 	static bool lastPressed = false;
 	bool switchPressed = false;
-	if (m_vidCapture.CameraControl() && m_vidCapture.VideoProcAmp())
+	if (m_vidCapture.CameraControl() && m_vidCapture.VideoProcAmp() && MagLockEngaged())
 	{
 		long value = -1, flags = 0;
 		HRESULT hr = m_vidCapture.CameraControl()->Get(CameraControl_Focus, &value, &flags);
@@ -504,7 +504,7 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 					m_DrawFocusTestResults = true;
 					m_MatlabImageTestReadyEvent.SetEvent();
 				}
-				CheckIfSaveFrames();
+				CheckIfSaveFrames(m_image8Data, m_image16Data);
 			}
 			if (SwitchPressed())
 			{
@@ -523,13 +523,13 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 	}
 }
 
-void COperatorConsole3View::CheckIfSaveFrames()
+void COperatorConsole3View::CheckIfSaveFrames(std::vector<uint8_t>& image8, std::vector<uint16_t>& image16)
 {
 	if (m_SaveEveryFrame8 && (m_SaveFrameCount < m_MaxSaveFrames))
 	{
 		CString filename;
 		filename.Format("%s\\%sFrame-%04d.bmp", m_PictureSavingFolder.GetBuffer(), m_PictureBaseName.GetBuffer(), m_FrameNumber);
-		SaveImage8ToFile(filename);
+		SaveImage8ToFile(filename, image8);
 		m_SaveFrameCount++;
 		if (m_SaveFrameCount >= m_MaxSaveFrames)
 		{
@@ -546,7 +546,7 @@ void COperatorConsole3View::CheckIfSaveFrames()
 		CStringW folder = UTF8toUTF16(m_PictureSavingFolder);
 		CStringW baseName = UTF8toUTF16(m_PictureBaseName);
 		filename.Format(L"%s\\%sFrame-%04d.tif", folder.GetBuffer(), baseName.GetBuffer(), m_FrameNumber);
-		SaveImage16ToFile(filename);
+		SaveImage16ToFile(filename, image16);
 		m_SaveFrameCount++;
 		if (m_SaveFrameCount >= m_MaxSaveFrames)
 		{
@@ -572,6 +572,16 @@ bool COperatorConsole3View::GetFrame(std::vector<uint8_t>& image8Data, std::vect
 	return success;
 }
 
+std::wstring COperatorConsole3View::GetImagePath(const wchar_t* testName)
+{
+	SYSTEMTIME tm;
+	GetLocalTime(&tm);
+	CStringW path;
+	path.Format(L"%USERPROFILE%\\Documents\\Eyelock\\%hs_%ls_%d-%02d-%02d-%02d-%02d.tif",
+		tm.wYear,tm.wMonth,tm.wDay,tm.wHour,tm.wMinute,tm.wSecond);
+	return path.GetString();
+}
+
 OperatorConsoleState COperatorConsole3View::HandleTesting1Camera(bool newState)
 {
 	if (MagLockEngaged())
@@ -594,7 +604,7 @@ OperatorConsoleState COperatorConsole3View::HandleTesting1Camera(bool newState)
 			CDC* pDC = GetDC();
 			OnDraw(pDC);
 			ReleaseDC(pDC);
-			CheckIfSaveFrames();
+			CheckIfSaveFrames(m_image8Data, m_image16DataTesting);
 
 			if (newState)
 			{
@@ -607,6 +617,8 @@ OperatorConsoleState COperatorConsole3View::HandleTesting1Camera(bool newState)
 				m_bRunTestFullChartSNR = true;
 				m_bFullChartSNRDone = false;
 				LOGMSG_DEBUG("Setting TestEvent");
+				std::wstring path = GetImagePath(L"FullChartSNR");
+				SaveImage16ToFile(path.c_str(), m_image16DataTesting);
 				m_MatlabImageTestReadyEvent.SetEvent(); // go ahead with the first test - just once
 			}
 			else
@@ -656,7 +668,7 @@ OperatorConsoleState COperatorConsole3View::HandleTesting2Camera(bool newState)
 			CDC* pDC = GetDC();
 			OnDraw(pDC);
 			ReleaseDC(pDC);
-			CheckIfSaveFrames();
+			CheckIfSaveFrames(m_image8Data, m_image16Data);
 
 			if (makingAverage)
 			{
@@ -682,6 +694,8 @@ OperatorConsoleState COperatorConsole3View::HandleTesting2Camera(bool newState)
 					m_bRunTestFullChartMTF50 = true;
 					m_bFullChartMTF50Done = false;
 					LOGMSG_DEBUG("Setting m_bRunTestFullChartMTF50 to run and setting event");
+					std::wstring path = GetImagePath(L"FullChartMTF50");
+					SaveImage16ToFile(path.c_str(), m_image16Data);
 					m_MatlabImageTestReadyEvent.SetEvent();
 				}
 			}
@@ -724,7 +738,7 @@ OperatorConsoleState COperatorConsole3View::HandleReportResults(bool newState)
 				int y = rc.Height() / 2;
 				pDC->TextOut(x, y, "Testing for this imager is done - please open and replace with next");
 				ReleaseDC(pDC);
-				CheckIfSaveFrames();
+				CheckIfSaveFrames(m_image8Data, m_image16Data);
 			}
 		}
 		return SetProgramState(eStateReportResults);
@@ -797,6 +811,7 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 				{
 					LOGMSG_DEBUG("Running RunTestQuickMTF50 - turning off m_bQuickMTF50Done");
 					pThis->m_bQuickMTF50Done = false;
+					AfxGetMainWnd()->SetWindowTextA("Running QuickMTF50");
 					pThis->m_DrawFocusTestResults = pThis->m_matlabTestCode.RunTestQuickMTF50(pThis->m_image8DataTesting, pThis->m_width, pThis->m_height, pThis->registrationCoordinates, pThis->m_outputQuickMTF50);
 					LOGMSG_DEBUG("After RunTestQuickMTF50 - " + std::to_string(pThis->m_DrawFocusTestResults));
 					if (pThis->m_DrawFocusTestResults)
@@ -821,6 +836,11 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 							pThis->WriteString(file, "}", false);
 						}
 						pThis->m_bQuickMTF50Done = true;
+						AfxGetMainWnd()->SetWindowTextA("Success from QuickMTF50");
+					}
+					else
+					{
+						AfxGetMainWnd()->SetWindowTextA("Error from QuickMTF50");
 					}
 					LOGMSG_DEBUG("Turning on m_bQuickMTF50Done");
 				}
@@ -828,6 +848,7 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 				{
 					pThis->m_bFullChartMTF50Done = false;
 					LOGMSG_DEBUG("Running RunTestFullChartMTF50 - with average");
+					AfxGetMainWnd()->SetWindowTextA("Running FullChartMTF50");
 					pThis->m_DrawFullChartMTF50 = pThis->m_matlabTestCode.RunTestFullChartMTF50(pThis->m_image16DataTesting, pThis->m_width, pThis->m_height, pThis->m_outputFullChartMTF50);
 					LOGMSG_DEBUG("After RunTestFullChartMTF50 - " + std::to_string(pThis->m_DrawFullChartMTF50));
 					if (pThis->m_DrawFullChartMTF50)
@@ -855,12 +876,14 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 						}
 						pThis->m_bFullChartMTF50Done = true;
 						pThis->m_bRunTestFullChartMTF50 = false;
+						AfxGetMainWnd()->SetWindowTextA("Success from FullChartMTF50");
 						LOGMSG_DEBUG("Turning off m_bRunTestFullChartMTF50 and turning on m_bFullChartMTF50Done");
 					}
 					else
 					{
 						pThis->m_bFullChartMTF50Done = false;
 						pThis->m_bRunTestFullChartMTF50 = true;
+						AfxGetMainWnd()->SetWindowTextA("Failure from FullChartMTF50");
 						LOGMSG_DEBUG("Error running RunTestFullChartMTF50 - will try to do again");
 					}
 				}
@@ -868,6 +891,7 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 				{
 					pThis->m_bFullChartSNRDone = false;
 					LOGMSG_DEBUG("Running RunTestFullChartSNR");
+					AfxGetMainWnd()->SetWindowTextA("Running FullChartSNR");
 					pThis->m_DrawFullChartSNR = pThis->m_matlabTestCode.RunTestFullChartSNR(pThis->m_image16DataTesting, pThis->m_width, pThis->m_height, pThis->m_outputFullChartSNR);
 					LOGMSG_DEBUG("After RunTestFullChartSNR - " + std::to_string(pThis->m_DrawFullChartSNR));
 					if (pThis->m_DrawFullChartSNR)
@@ -896,12 +920,14 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 						}
 						pThis->m_bRunTestFullChartSNR = false;
 						pThis->m_bFullChartSNRDone = true;
+						AfxGetMainWnd()->SetWindowTextA("Success from FullChartSNR");
 						LOGMSG_DEBUG("Turning off m_bRunTestFullChartSNR and turning on m_bRunTestFullChartSNR");
 					}
 					else
 					{
 						pThis->m_bRunTestFullChartSNR = true;
 						pThis->m_bFullChartSNRDone = false;
+						AfxGetMainWnd()->SetWindowTextA("Failure from FullChartSNR");
 						LOGMSG_DEBUG("Error running RunTestFullChartSNR");
 					}
 				}
@@ -981,7 +1007,7 @@ UINT __cdecl COperatorConsole3View::ThreadProc(LPVOID pParam)
 	return 0;   // thread completed successfully
 }
 
-void COperatorConsole3View::SaveImage16ToFile(const wchar_t *pathname)
+void COperatorConsole3View::SaveImage16ToFile(const wchar_t *pathname, const std::vector<uint16_t>& image)
 {
 	// Create factory
 	IWICImagingFactoryPtr sp_factory { nullptr };
@@ -1041,7 +1067,7 @@ void COperatorConsole3View::SaveImage16ToFile(const wchar_t *pathname)
 						{
 							UINT stride = m_width * 2;
 							UINT bufferSize = m_height * stride;
-							hr = sp_frame->WritePixels(m_height, stride, bufferSize, LPBYTE(&m_image16Data[0]));
+							hr = sp_frame->WritePixels(m_height, stride, bufferSize, LPBYTE(&image[0]));
 						}
 						// Commit frame
 						if (SUCCEEDED(hr))
@@ -1084,7 +1110,7 @@ bool COperatorConsole3View::LoadImage8ToFile(const char* filename)
 	return success;
 }
 
-void COperatorConsole3View::SaveImage8ToFile(const char* filename)
+void COperatorConsole3View::SaveImage8ToFile(const char* filename, std::vector<uint8_t>& image8)
 {
 	BITMAPFILEHEADER bmfh = { 0 };
 	bmfh.bfType = 0x4d42;  // 'BM'
@@ -1102,8 +1128,8 @@ void COperatorConsole3View::SaveImage8ToFile(const char* filename)
 			file.Write((LPVOID)m_pBitmapInfo, m_sizeBitmapInfo);
 			{
 				ReadLock lock(m_pictureLock);
-				UINT cbSize = UINT(m_image8Data.size());
-				file.Write((LPVOID)&m_image8Data[0], cbSize);
+				UINT cbSize = UINT(image8.size());
+				file.Write((LPVOID)&image8[0], cbSize);
 			}
 			file.Close();
 		}
@@ -1231,7 +1257,7 @@ void COperatorConsole3View::OnCameraSaveSingleImageToDisk()
 	{
 		m_PictureSavingFolder = FileDlg.GetFolderPath();
 		CString filename = FileDlg.GetPathName();
-		SaveImage8ToFile(filename);
+		SaveImage8ToFile(filename, m_image8Data);
 	}
 }
 
@@ -1453,7 +1479,7 @@ void COperatorConsole3View::OnCameraSaveSingle10BitImageToTiffFile()
 	{
 		m_PictureSavingFolder = FileDlg.GetFolderPath();
 		CStringW filename = UTF8toUTF16(FileDlg.GetPathName());
-		SaveImage16ToFile(filename);
+		SaveImage16ToFile(filename, m_image16Data);
 	}
 }
 
