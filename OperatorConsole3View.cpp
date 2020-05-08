@@ -88,10 +88,10 @@ COperatorConsole3View::COperatorConsole3View() noexcept :
 	// TODO: add construction code here
 	::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
 	registrationCoordinates.resize(4);
-	registrationCoordinates[0] = CPoint(775, 604);
-	registrationCoordinates[1] = CPoint(1825, 603);
-	registrationCoordinates[2] = CPoint(1834, 1397);
-	registrationCoordinates[3] = CPoint(776, 1395);
+	registrationCoordinates[0] = CPoint(768, 575);
+	registrationCoordinates[1] = CPoint(1818, 589);
+	registrationCoordinates[2] = CPoint(1810, 1375);
+	registrationCoordinates[3] = CPoint(763, 1370);
 	
 }
 
@@ -170,10 +170,8 @@ void COperatorConsole3View::OnDraw(CDC* pDC)
 		HGDIOBJ originalPen = pDC->SelectObject(GetStockObject(DC_PEN));
 		HGDIOBJ originalBrush = pDC->SelectObject(GetStockObject(HOLLOW_BRUSH));
 		pDC->SetDCPenColor(RGB(0, 255, 0));
-		DrawRegistrationPoint(pDC, 775, 604);
-		DrawRegistrationPoint(pDC, 1825,603);
-		DrawRegistrationPoint(pDC, 1834, 1397);
-		DrawRegistrationPoint(pDC, 776, 1395);
+		for(auto i = registrationCoordinates.begin(); i != registrationCoordinates.end(); i++)
+			DrawRegistrationPoint(pDC, i->x, i->y);
 		pDC->SelectObject(originalPen);
 		pDC->SelectObject(originalBrush);
 	}
