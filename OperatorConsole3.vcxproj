@@ -175,7 +175,7 @@
       <PreprocessorDefinitions>_WINDOWS;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>C:\Program Files\MATLAB\MATLAB Runtime\v98\extern\include</AdditionalIncludeDirectories>
-      <DisableSpecificWarnings>26812;26439</DisableSpecificWarnings>
+      <DisableSpecificWarnings>26812;26439;26478</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

@@ -9,6 +9,10 @@
 class CameraInfoParser
 {
 public:
+	CameraInfoParser() : ver(0), wafer(0), chipNumber(0)
+	{
+		memset(&lot[0], 0, sizeof(lot));
+	}
 
 	// Returns the starting memory address to read for the camera ID
 	int StartAddress() { return 0x37a0; }

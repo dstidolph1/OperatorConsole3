@@ -244,7 +244,9 @@ bool COperatorConsole3View::OpenJSON(CFile& file, CString filename)
 	CString sFilename;
 	sFilename.Format("%%USERPROFILE%%\\Documents\\EyeLock\\%s_%s_%d-%02d-%02d-%02d-%02d-%02d.json",
 		m_CameraID.c_str(), filename.GetString(), st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
-	if (file.Open(sFilename, CFile::modeCreate | CFile::modeWrite))
+	char path[MAX_PATH];
+	ExpandEnvironmentStringsA(sFilename.GetString(), path, MAX_PATH);
+	if (file.Open(path, CFile::modeCreate | CFile::modeWrite))
 	{
 		success = true;
 	}
@@ -898,7 +900,7 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 					pThis->m_bFullChartMTF50Done = false;
 					LOGMSG_DEBUG("Running RunTestFullChartMTF50 - with average");
 					AfxGetMainWnd()->SetWindowTextA("Running FullChartMTF50");
-					pThis->m_DrawFullChartMTF50 = pThis->m_matlabTestCode.RunTestFullChartMTF50(pThis->m_image16DataTesting, pThis->m_width, pThis->m_height, pThis->m_outputFullChartMTF50);
+					pThis->m_DrawFullChartMTF50 = pThis->m_matlabTestCode.RunTestFullChartMTF50(pThis->m_image16DataTesting, pThis->m_width, pThis->m_height, pThis->registrationCoordinates, pThis->m_outputFullChartMTF50);
 					LOGMSG_DEBUG("After RunTestFullChartMTF50 - " + std::to_string(pThis->m_DrawFullChartMTF50));
 					if (pThis->m_DrawFullChartMTF50)
 					{
@@ -941,7 +943,7 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 					pThis->m_bFullChartSNRDone = false;
 					LOGMSG_DEBUG("Running RunTestFullChartSNR");
 					AfxGetMainWnd()->SetWindowTextA("Running FullChartSNR");
-					pThis->m_DrawFullChartSNR = pThis->m_matlabTestCode.RunTestFullChartSNR(pThis->m_image16DataTesting, pThis->m_width, pThis->m_height, pThis->m_outputFullChartSNR);
+					pThis->m_DrawFullChartSNR = pThis->m_matlabTestCode.RunTestFullChartSNR(pThis->m_image16DataTesting, pThis->m_width, pThis->m_height, pThis->registrationCoordinates, pThis->m_outputFullChartSNR);
 					LOGMSG_DEBUG("After RunTestFullChartSNR - " + std::to_string(pThis->m_DrawFullChartSNR));
 					if (pThis->m_DrawFullChartSNR)
 					{
@@ -1059,6 +1061,8 @@ UINT __cdecl COperatorConsole3View::ThreadProc(LPVOID pParam)
 void COperatorConsole3View::SaveImage16ToFile(const wchar_t *pathname, const std::vector<uint16_t>& image)
 {
 	// Create factory
+	wchar_t path[MAX_PATH];
+	ExpandEnvironmentStringsW(pathname, path, MAX_PATH);
 	IWICImagingFactoryPtr sp_factory { nullptr };
 	HRESULT hr = sp_factory.CreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER);
 	if (SUCCEEDED(hr))
@@ -1068,63 +1072,66 @@ void COperatorConsole3View::SaveImage16ToFile(const wchar_t *pathname, const std
 		hr = sp_factory->CreateStream(&sp_stream);
 		if (SUCCEEDED(hr))
 		{
-			hr = sp_stream->InitializeFromFilename(pathname, GENERIC_WRITE);
-			// Create encoder
-			IWICBitmapEncoderPtr sp_encoder{ nullptr };
-			hr = sp_factory->CreateEncoder(GUID_ContainerFormatTiff, nullptr, &sp_encoder);
+			hr = sp_stream->InitializeFromFilename(path, GENERIC_WRITE);
 			if (SUCCEEDED(hr))
 			{
-				// Initialize encoder with stream
-				hr = sp_encoder->Initialize(sp_stream, WICBitmapEncoderNoCache);
+				// Create encoder
+				IWICBitmapEncoderPtr sp_encoder{ nullptr };
+				hr = sp_factory->CreateEncoder(GUID_ContainerFormatTiff, nullptr, &sp_encoder);
 				if (SUCCEEDED(hr))
 				{
-					// Create new frame
-					IWICBitmapFrameEncodePtr sp_frame{ nullptr };
-					IPropertyBag2Ptr sp_properties{ nullptr };
-					hr = sp_encoder->CreateNewFrame(&sp_frame, &sp_properties);
+					// Initialize encoder with stream
+					hr = sp_encoder->Initialize(sp_stream, WICBitmapEncoderNoCache);
 					if (SUCCEEDED(hr))
 					{
-						// This is how you customize the TIFF output.
-						PROPBAG2 option = { 0 };
-						option.pstrName = L"TiffCompressionMethod";
-						VARIANT varValue;
-						VariantInit(&varValue);
-						varValue.vt = VT_UI1;
-						varValue.bVal = WICTiffCompressionZIP;
-						hr = sp_properties->Write(1, &option, &varValue);
+						// Create new frame
+						IWICBitmapFrameEncodePtr sp_frame{ nullptr };
+						IPropertyBag2Ptr sp_properties{ nullptr };
+						hr = sp_encoder->CreateNewFrame(&sp_frame, &sp_properties);
 						if (SUCCEEDED(hr))
 						{
-							hr = sp_frame->Initialize(sp_properties);
-						}
-						if (SUCCEEDED(hr))
-						{
-							hr = sp_frame->SetSize(m_width, m_height);
-						}
-						if (SUCCEEDED(hr))
-						{
-							// Set pixel format
-							// SetPixelFormat() requires a pointer to non-const
-							auto pf{ GUID_WICPixelFormat16bppGray };
-							hr = sp_frame->SetPixelFormat(&pf);
-							if (!::IsEqualGUID(pf, GUID_WICPixelFormat16bppGray))
+							// This is how you customize the TIFF output.
+							PROPBAG2 option = { 0 };
+							option.pstrName = L"TiffCompressionMethod";
+							VARIANT varValue;
+							VariantInit(&varValue);
+							varValue.vt = VT_UI1;
+							varValue.bVal = WICTiffCompressionZIP;
+							hr = sp_properties->Write(1, &option, &varValue);
+							if (SUCCEEDED(hr))
 							{
-								// Report unsupported pixel format
-								CheckError(WINCODEC_ERR_UNSUPPORTEDPIXELFORMAT);
+								hr = sp_frame->Initialize(sp_properties);
 							}
+							if (SUCCEEDED(hr))
+							{
+								hr = sp_frame->SetSize(m_width, m_height);
+							}
+							if (SUCCEEDED(hr))
+							{
+								// Set pixel format
+								// SetPixelFormat() requires a pointer to non-const
+								auto pf{ GUID_WICPixelFormat16bppGray };
+								hr = sp_frame->SetPixelFormat(&pf);
+								if (!::IsEqualGUID(pf, GUID_WICPixelFormat16bppGray))
+								{
+									// Report unsupported pixel format
+									CheckError(WINCODEC_ERR_UNSUPPORTEDPIXELFORMAT);
+								}
+							}
+							if (SUCCEEDED(hr))
+							{
+								UINT stride = m_width * 2;
+								UINT bufferSize = m_height * stride;
+								hr = sp_frame->WritePixels(m_height, stride, bufferSize, LPBYTE(&image[0]));
+							}
+							// Commit frame
+							if (SUCCEEDED(hr))
+								sp_frame->Commit();
 						}
+						// Commit image
 						if (SUCCEEDED(hr))
-						{
-							UINT stride = m_width * 2;
-							UINT bufferSize = m_height * stride;
-							hr = sp_frame->WritePixels(m_height, stride, bufferSize, LPBYTE(&image[0]));
-						}
-						// Commit frame
-						if (SUCCEEDED(hr))
-							sp_frame->Commit();
+							sp_encoder->Commit();
 					}
-					// Commit image
-					if (SUCCEEDED(hr))
-						sp_encoder->Commit();
 				}
 			}
 		}

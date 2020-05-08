@@ -29,8 +29,9 @@ END_MESSAGE_MAP()
 
 // COperatorConsole3App construction
 
-COperatorConsole3App::COperatorConsole3App() noexcept
+COperatorConsole3App::COperatorConsole3App() noexcept : m_nAppLook(ID_VIEW_APPLOOK_WINDOWS_7)
 {
+	m_nAppLook = ID_VIEW_APPLOOK_WINDOWS_7;
 	m_bHiColorIcons = TRUE;
 
 	// support Restart Manager

@@ -41,8 +41,8 @@ public:
 
 	bool Initialize();
 	void Shutdown();
-	bool RunTestFullChartMTF50(std::vector<uint16_t>& image, int width, int height, std::vector<FullChartMTF50Data> &output);
-	bool RunTestFullChartSNR(std::vector<uint16_t>& image, int width, int height, std::vector<FullChartSNRData> &output);
+	bool RunTestFullChartMTF50(std::vector<uint16_t>& image, int width, int height, const std::vector<CPoint>& registrationCoordinates, std::vector<FullChartMTF50Data> &output);
+	bool RunTestFullChartSNR(std::vector<uint16_t>& image, int width, int height, const std::vector<CPoint>& registrationCoordinates, std::vector<FullChartSNRData> &output);
 	bool RunTestQuickMTF50(std::vector<uint8_t>& image, int width, int height, const std::vector<CPoint> &registrationCoordinates, std::vector<QuickMTF50Data> &output);
 	
 };

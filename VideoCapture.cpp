@@ -598,8 +598,8 @@ HRESULT VideoCapture::sgGetSampleGrabberMediaType(ISampleGrabber * pGrab)
 		return hr;
     }
 
-    VIDEOINFOHEADER *pVih = (VIDEOINFOHEADER *)mt.pbFormat;
-	if (pVih)
+    VIDEOINFOHEADER *pVih = reinterpret_cast<VIDEOINFOHEADER *>(mt.pbFormat);
+	if (pVih != NULL)
 	{
 		gWidth = pVih->bmiHeader.biWidth;
 		gHeight = pVih->bmiHeader.biHeight;

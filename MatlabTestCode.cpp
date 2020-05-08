@@ -58,7 +58,7 @@ void MatlabTestCode::Shutdown()
 //There are only 46 because with our setup the field of view only allows us to see 46 edges.  
 //Column 1 are the X-coordinates of the edges.  Column 2 are the Y-coordinates of the edges.  
 //Column 3 are all the MTF50 vals for the edges
-bool MatlabTestCode::RunTestFullChartMTF50(std::vector<uint16_t>& image, int width, int height, std::vector<FullChartMTF50Data>& outputData)
+bool MatlabTestCode::RunTestFullChartMTF50(std::vector<uint16_t>& image, int width, int height, const std::vector<CPoint>& regPts, std::vector<FullChartMTF50Data>& outputData)
 {
 	bool success = false;
 	try
@@ -68,10 +68,14 @@ bool MatlabTestCode::RunTestFullChartMTF50(std::vector<uint16_t>& image, int wid
 		md::buffer_ptr_t<uint16_t> imageData = factory.createBuffer<uint16_t>(imageLength);
 		uint16_t* pImage = imageData.get();
 		memcpy(pImage, &image[0], imageLength * sizeof(imageData[0]));
+		md::TypedArray<double> xArray = factory.createArray<double>({ 4, 1 },
+			{ double(regPts[0].x), double(regPts[1].x), double(regPts[2].x), double(regPts[3].x) });
+		md::TypedArray<double> yArray = factory.createArray<double>({ 4, 1 },
+			{ double(regPts[0].y), double(regPts[1].y), double(regPts[2].y), double(regPts[3].y) });
 		unsigned long long imageWidth = width;
 		unsigned long long imageHeight = height;
 		md::TypedArray<uint16_t> imageArray = factory.createArrayFromBuffer<uint16_t>({ imageHeight, imageWidth }, std::move(imageData), md::MemoryLayout::ROW_MAJOR);
-		std::vector<md::Array>params{ imageArray };
+		std::vector<md::Array>params{ imageArray, xArray, yArray };
 		std::vector<matlab::data::Array> output = m_matlabLibrary->feval("fullChartMTF50", 1, params);
 		for (auto outputElement : output)
 		{
@@ -151,7 +155,7 @@ bool MatlabTestCode::RunTestFullChartMTF50(std::vector<uint16_t>& image, int wid
 //  Column 3 are the mean intensity vals.
 //  Column 4 are the noise vals.
 //  Column 5 are all the SNR vals.
-bool MatlabTestCode::RunTestFullChartSNR(std::vector<uint16_t>& image, int width, int height, std::vector<FullChartSNRData>& outputData)
+bool MatlabTestCode::RunTestFullChartSNR(std::vector<uint16_t>& image, int width, int height, const std::vector<CPoint>& regPts, std::vector<FullChartSNRData>& outputData)
 {
 	bool success = false;
 	try
@@ -161,10 +165,14 @@ bool MatlabTestCode::RunTestFullChartSNR(std::vector<uint16_t>& image, int width
 		md::buffer_ptr_t<uint16_t> imageData = factory.createBuffer<uint16_t>(imageLength);
 		uint16_t* pImage = imageData.get();
 		memcpy(pImage, &image[0], imageLength * sizeof(image[0]));
+		md::TypedArray<double> xArray = factory.createArray<double>({ 4, 1 },
+			{ double(regPts[0].x), double(regPts[1].x), double(regPts[2].x), double(regPts[3].x) });
+		md::TypedArray<double> yArray = factory.createArray<double>({ 4, 1 },
+			{ double(regPts[0].y), double(regPts[1].y), double(regPts[2].y), double(regPts[3].y) });
 		unsigned long long imageWidth = width;
 		unsigned long long imageHeight = height;
 		md::TypedArray<uint16_t> imageArray = factory.createArrayFromBuffer<uint16_t>({ imageHeight, imageWidth }, std::move(imageData), md::MemoryLayout::ROW_MAJOR);
-		std::vector<md::Array>params{ imageArray };
+		std::vector<md::Array>params{ imageArray, xArray, yArray };
 		std::vector<matlab::data::Array> output = m_matlabLibrary->feval("fullChartSNR", 1, params);
 		outputData.clear();
 		for (auto outputElement : output) // process vector of 20 rows
