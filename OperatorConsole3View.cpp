@@ -224,6 +224,16 @@ void COperatorConsole3View::OnDraw(CDC* pDC)
 			}
 		}
 	}
+	else if (m_programState == eStateReportResults)
+	{
+		CRect rc;
+		GetClientRect(&rc);
+		CBrush brBkGnd;
+		brBkGnd.CreateSolidBrush(RGB(252, 255, 255));
+		int x = rc.Width() / 2 - 100;
+		int y = rc.Height() / 2;
+		pDC->TextOut(x, y, "Testing for this imager is done - please open and replace with next");
+	}
 }
 
 bool COperatorConsole3View::OpenJSON(CFile& file, CString filename)
@@ -232,7 +242,7 @@ bool COperatorConsole3View::OpenJSON(CFile& file, CString filename)
 	SYSTEMTIME st;
 	GetLocalTime(&st);
 	CString sFilename;
-	sFilename.Format("%s_%s_%d-%02d-%02d-%02d-%02d.json",
+	sFilename.Format("%%USERPROFILE%%\\Documents\\EyeLock\\%s_%s_%d-%02d-%02d-%02d-%02d-%02d.json",
 		m_CameraID.c_str(), filename.GetString(), st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
 	if (file.Open(sFilename, CFile::modeCreate | CFile::modeWrite))
 	{
@@ -489,9 +499,13 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 		{
 			if (GetFrame(m_image8Data, m_image16Data))
 			{
+#if defined(DRAW_MAIN_THREAD)
 				CDC* pDC = GetDC();
 				OnDraw(pDC);
 				ReleaseDC(pDC);
+#else
+				Invalidate(FALSE);
+#endif
 				if (!m_ActiveTestRunning)
 				{
 					m_ActiveTestRunning = true;
@@ -577,9 +591,9 @@ std::wstring COperatorConsole3View::GetImagePath(const wchar_t* testName)
 	SYSTEMTIME tm;
 	GetLocalTime(&tm);
 	CStringW path;
-	path.Format(L"%USERPROFILE%\\Documents\\Eyelock\\%hs_%ls_%d-%02d-%02d-%02d-%02d.tif",
-		tm.wYear,tm.wMonth,tm.wDay,tm.wHour,tm.wMinute,tm.wSecond);
-	return path.GetString();
+	path.Format(L"%%USERPROFILE%%\\Documents\\Eyelock\\%hs_%ls_%d-%02d-%02d-%02d-%02d-%02d.tif",
+		m_CameraID.c_str(), testName,tm.wYear,tm.wMonth,tm.wDay,tm.wHour,tm.wMinute,tm.wSecond);
+	return std::wstring(path.GetString());
 }
 
 OperatorConsoleState COperatorConsole3View::HandleTesting1Camera(bool newState)
@@ -587,7 +601,7 @@ OperatorConsoleState COperatorConsole3View::HandleTesting1Camera(bool newState)
 	if (MagLockEngaged())
 	{
 		// Get Video Frame
-		bool frameValid = GetFrame(m_image8Data, m_image16DataTesting);
+		bool frameValid = GetFrame(m_image8Data, m_image16Data);
 		if (frameValid)
 		{
 			if (newState)
@@ -600,10 +614,14 @@ OperatorConsoleState COperatorConsole3View::HandleTesting1Camera(bool newState)
 				m_bRunTestQuickMTF50 = false;
 				m_bFullChartSNRDone = false;
 			}
+#if defined(DRAW_MAIN_THREAD)
 			// Draw video frame
 			CDC* pDC = GetDC();
 			OnDraw(pDC);
 			ReleaseDC(pDC);
+#else
+			Invalidate();
+#endif
 			CheckIfSaveFrames(m_image8Data, m_image16DataTesting);
 
 			if (newState)
@@ -618,6 +636,7 @@ OperatorConsoleState COperatorConsole3View::HandleTesting1Camera(bool newState)
 				m_bFullChartSNRDone = false;
 				LOGMSG_DEBUG("Setting TestEvent");
 				std::wstring path = GetImagePath(L"FullChartSNR");
+				m_image16DataTesting = m_image16Data;
 				SaveImage16ToFile(path.c_str(), m_image16DataTesting);
 				m_MatlabImageTestReadyEvent.SetEvent(); // go ahead with the first test - just once
 			}
@@ -628,6 +647,21 @@ OperatorConsoleState COperatorConsole3View::HandleTesting1Camera(bool newState)
 				{
 					LOGMSG_DEBUG("FullChartSNR is done, so advance state");
 					return SetProgramState(eStateTesting2Camera);
+				}
+				else if (!m_ActiveTestRunning)
+				{
+					m_bRunTestQuickMTF50 = false;
+					m_DrawFocusTestResults = false;
+					m_DrawFullChartMTF50 = false;
+					m_RunFocusTest = false;
+
+					m_bRunTestFullChartSNR = true;
+					m_bFullChartSNRDone = false;
+					LOGMSG_DEBUG("Retesting from failure - Setting TestEvent");
+					std::wstring path = GetImagePath(L"FullChartSNR");
+					m_image16DataTesting = m_image16Data;
+					SaveImage16ToFile(path.c_str(), m_image16DataTesting);
+					m_MatlabImageTestReadyEvent.SetEvent(); // go ahead with the first test - just once
 				}
 			}
 		}
@@ -665,9 +699,13 @@ OperatorConsoleState COperatorConsole3View::HandleTesting2Camera(bool newState)
 		bool frameValid = GetFrame(m_image8Data, m_image16Data);
 		if (frameValid)
 		{
+#if defined(DRAW_MAIN_THREAD)
 			CDC* pDC = GetDC();
 			OnDraw(pDC);
 			ReleaseDC(pDC);
+#else
+			Invalidate();
+#endif
 			CheckIfSaveFrames(m_image8Data, m_image16Data);
 
 			if (makingAverage)
@@ -703,6 +741,13 @@ OperatorConsoleState COperatorConsole3View::HandleTesting2Camera(bool newState)
 			{
 				return SetProgramState(eStateReportResults);
 			}
+			else if (!m_ActiveTestRunning)
+			{
+				m_bRunTestFullChartMTF50 = true;
+				m_bFullChartMTF50Done = false;
+				LOGMSG_DEBUG("Setting m_bRunTestFullChartMTF50 to run and setting event");
+				m_MatlabImageTestReadyEvent.SetEvent();
+			}
 		}
 		return SetProgramState(eStateTesting2Camera);
 	}
@@ -726,6 +771,7 @@ OperatorConsoleState COperatorConsole3View::HandleReportResults(bool newState)
 		bool frameValid = GetFrame(m_image8Data, m_image16Data);
 		if (frameValid)
 		{
+#if defined(DRAW_MAIN_THREAD)
 			CDC* pDC = GetDC();
 			if (pDC)
 			{
@@ -738,8 +784,11 @@ OperatorConsoleState COperatorConsole3View::HandleReportResults(bool newState)
 				int y = rc.Height() / 2;
 				pDC->TextOut(x, y, "Testing for this imager is done - please open and replace with next");
 				ReleaseDC(pDC);
-				CheckIfSaveFrames(m_image8Data, m_image16Data);
 			}
+#else
+			Invalidate();
+#endif
+			CheckIfSaveFrames(m_image8Data, m_image16Data);
 		}
 		return SetProgramState(eStateReportResults);
 	}
