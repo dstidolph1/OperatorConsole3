@@ -45,4 +45,5 @@
 #endif
 #endif
 
-
+#include "Properties.h"
+extern CProperties prop;

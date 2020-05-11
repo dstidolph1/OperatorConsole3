@@ -40,11 +40,15 @@ CLogger::CLogger()
 
 CLogger::~CLogger()
 {
-	for (int i=0; i<m_pTargets.GetSize(); i++)
-		delete m_pTargets[i];
-	m_pTargets.RemoveAll(); 
+	Close();
 }
 
+void CLogger::Close()
+{
+	for (int i = 0; i < m_pTargets.GetSize(); i++)
+		delete m_pTargets[i];
+	m_pTargets.RemoveAll();
+}
 /////////////////////////////////////////////////////////////////////////////
 // Method-Implementation
 /////////////////////////////////////////////////////////////////////////////

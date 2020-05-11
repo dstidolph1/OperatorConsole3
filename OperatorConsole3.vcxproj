@@ -201,6 +201,7 @@
     <ClInclude Include="dxtrans.h" />
     <ClInclude Include="FileView.h" />
     <ClInclude Include="framework.h" />
+    <ClInclude Include="iniFile.h" />
     <ClInclude Include="Logging.h" />
     <ClInclude Include="MainFrm.h" />
     <ClInclude Include="MatlabMTF50\MatlabMTF50Lib_2.h" />
@@ -210,6 +211,7 @@
     <ClInclude Include="OperatorConsole3View.h" />
     <ClInclude Include="OutputWnd.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="Properties.h" />
     <ClInclude Include="PropertiesWnd.h" />
     <ClInclude Include="qedit.h" />
     <ClInclude Include="Resource.h" />
@@ -221,6 +223,7 @@
   <ItemGroup>
     <ClCompile Include="ClassView.cpp" />
     <ClCompile Include="FileView.cpp" />
+    <ClCompile Include="iniFile.cpp" />
     <ClCompile Include="Logging.cpp" />
     <ClCompile Include="MainFrm.cpp" />
     <ClCompile Include="MatlabTestCode.cpp" />
@@ -234,6 +237,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="Properties.cpp" />
     <ClCompile Include="PropertiesWnd.cpp" />
     <ClCompile Include="SaveMultipleFramesInfo.cpp" />
     <ClCompile Include="VideoCapture.cpp" />

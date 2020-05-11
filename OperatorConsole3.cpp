@@ -16,6 +16,7 @@
 #define new DEBUG_NEW
 #endif
 
+CProperties prop;
 
 // COperatorConsole3App
 

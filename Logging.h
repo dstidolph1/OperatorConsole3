@@ -122,6 +122,7 @@ namespace Logging
 		~CLogger();
 		
 		void AddTarget(ILogTarget* pTarget);
+		void Close();
 		void Log(LOG_LEVEL lvl, LPCTSTR szMsg, LPCTSTR szFile, LPCTSTR szFunction, int nLine);
 		void Log(LOG_LEVEL lvl, std::string sMsg, LPCTSTR szFile, LPCTSTR szFunction, int nLine)
 		{
@@ -136,6 +137,10 @@ namespace Logging
 
 	public:
 		static CLogger* getDefaultInstance() { return &m_SingletonInstance; }
+		void Close()
+		{
+			m_SingletonInstance.Close();
+		}
 	};
 }
 

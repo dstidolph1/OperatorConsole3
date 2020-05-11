@@ -31,7 +31,6 @@ using namespace Gdiplus;
 // Global declaration
 
 //#define USE_SOFTWARE_FOR_STATION
-#define NUM_AVERAGE_IMAGES 10
 
 using _com_util::CheckError;
 using container = std::vector<std::vector<bool>>;
@@ -87,12 +86,30 @@ COperatorConsole3View::COperatorConsole3View() noexcept :
 {
 	// TODO: add construction code here
 	::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
-	registrationCoordinates.resize(4);
-	registrationCoordinates[0] = CPoint(768, 575);
-	registrationCoordinates[1] = CPoint(1818, 589);
-	registrationCoordinates[2] = CPoint(1810, 1375);
-	registrationCoordinates[3] = CPoint(763, 1370);
-	
+	if (prop.Load())
+	{
+		size_t nFiducials = prop.m_Fiducials.size();
+		registrationCoordinates.resize(nFiducials);
+		for (size_t i = 0; i < nFiducials; i++)
+		{
+			registrationCoordinates[i] = prop.m_Fiducials[i];
+		}
+		m_numImagesToAverage = prop.m_NumImagesAverage;
+		size_t nFocusPoints = prop.m_QuickPoints.size();
+		m_FocusPoints.resize(nFocusPoints);
+		for (size_t i = 0; i < nFocusPoints; i++)
+		{
+			m_FocusPoints[i] = prop.m_QuickPoints[i];
+		}
+	}
+	else
+	{
+		registrationCoordinates.resize(4);
+		registrationCoordinates[0] = CPoint(768, 575);
+		registrationCoordinates[1] = CPoint(1818, 589);
+		registrationCoordinates[2] = CPoint(1810, 1375);
+		registrationCoordinates[3] = CPoint(763, 1370);
+	}
 }
 
 COperatorConsole3View::~COperatorConsole3View()
@@ -112,10 +129,23 @@ BOOL COperatorConsole3View::PreCreateWindow(CREATESTRUCT& cs)
 	return CScrollView::PreCreateWindow(cs);
 }
 
-void COperatorConsole3View::DisplayFocusResult(CDC* pDC, int x, int y, double value)
+void COperatorConsole3View::DisplayFocusResult(CDC* pDC, CPoint pt, double value)
 {
 	CString sValue;
 	sValue.Format("%.1f",value);
+	int x = pt.x;
+	int y = pt.y;
+	if (m_shrinkDisplay)
+	{
+		x = x / m_zoomDivision;
+		y = y / m_zoomDivision;
+	}
+	else if (m_magnifyDisplay)
+	{
+		x = x * m_zoomMultiplier;
+		y = y * m_zoomMultiplier;
+	}
+
 	pDC->TextOut(x, y, sValue.GetString());
 }
 
@@ -177,36 +207,20 @@ void COperatorConsole3View::OnDraw(CDC* pDC)
 	}
 	if (m_DrawFocusTestResults && !m_outputQuickMTF50.empty())
 	{
-		if (m_shrinkDisplay)
-		{
-			DisplayFocusResult(pDC, 1201 / m_zoomDivision, 515 / m_zoomDivision, m_outputQuickMTF50[0].mtf50);
-			DisplayFocusResult(pDC, 815 / m_zoomDivision, 880 / m_zoomDivision, m_outputQuickMTF50[1].mtf50);
-			DisplayFocusResult(pDC, 1205 / m_zoomDivision, 1145 / m_zoomDivision, m_outputQuickMTF50[2].mtf50);
-			DisplayFocusResult(pDC, 1700 / m_zoomDivision, 950 / m_zoomDivision, m_outputQuickMTF50[3].mtf50);
-			DisplayFocusResult(pDC, 1180 / m_zoomDivision, 1450 / m_zoomDivision, m_outputQuickMTF50[4].mtf50);
-		}
-		else if (m_magnifyDisplay)
-		{
-			DisplayFocusResult(pDC, 1201 * m_zoomMultiplier, 515 * m_zoomMultiplier, m_outputQuickMTF50[0].mtf50);
-			DisplayFocusResult(pDC, 815 * m_zoomMultiplier, 880 * m_zoomMultiplier, m_outputQuickMTF50[1].mtf50);
-			DisplayFocusResult(pDC, 1205 * m_zoomMultiplier, 1145 * m_zoomMultiplier, m_outputQuickMTF50[2].mtf50);
-			DisplayFocusResult(pDC, 1700 * m_zoomMultiplier, 950 * m_zoomMultiplier, m_outputQuickMTF50[3].mtf50);
-			DisplayFocusResult(pDC, 1180 * m_zoomMultiplier, 1450 * m_zoomMultiplier, m_outputQuickMTF50[4].mtf50);
-		}
-		else
-		{
-			DisplayFocusResult(pDC, 1201, 515, m_outputQuickMTF50[0].mtf50);
-			DisplayFocusResult(pDC, 815, 880, m_outputQuickMTF50[1].mtf50);
-			DisplayFocusResult(pDC, 1205, 1145, m_outputQuickMTF50[2].mtf50);
-			DisplayFocusResult(pDC, 1700, 950, m_outputQuickMTF50[3].mtf50);
-			DisplayFocusResult(pDC, 1180, 1450, m_outputQuickMTF50[4].mtf50);
-		}
+		double total = 0.0;
+		for (auto i = m_outputQuickMTF50.begin(); i != m_outputQuickMTF50.end(); i++)
+			total += i->mtf50;
+		double average = total / double(m_outputQuickMTF50.size());
+
+		for(int i=0; i< m_FocusPoints.size(); i++)
+			DisplayFocusResult(pDC, m_FocusPoints[i], m_outputQuickMTF50[i].mtf50);
+		DisplayFocusResult(pDC, CPoint((m_width / 2), (m_height / 2)), average);
 	}
 	else if (m_DrawFullChartMTF50 && !m_outputFullChartMTF50.empty())
 	{
 		for (auto i = m_outputFullChartMTF50.begin(); i != m_outputFullChartMTF50.end(); i++)
 		{
-			DisplayFocusResult(pDC, int(i->x), int(i->y), i->mtf50);
+			DisplayFocusResult(pDC, CPoint(int(i->x), int(i->y)), i->mtf50);
 		}
 	}
 	else if (m_DrawFullChartSNR && !m_outputFullChartSNR.empty())
@@ -216,10 +230,10 @@ void COperatorConsole3View::OnDraw(CDC* pDC)
 		{
 			if (index < m_GreyBoxes.size())
 			{
-				DisplayFocusResult(pDC, int(i->x), int(i->y), double(index));
-				DisplayFocusResult(pDC, int(i->x), int(i->y) + 10, i->meanIntensity);
-				DisplayFocusResult(pDC, int(i->x), int(i->y) + 20, i->RMSNoise);
-				DisplayFocusResult(pDC, int(i->x), int(i->y) + 30, i->SignalToNoise);
+				DisplayFocusResult(pDC, CPoint(int(i->x), int(i->y)), double(index));
+				DisplayFocusResult(pDC, CPoint(int(i->x), int(i->y) + 10), i->meanIntensity);
+				DisplayFocusResult(pDC, CPoint(int(i->x), int(i->y) + 20), i->RMSNoise);
+				DisplayFocusResult(pDC, CPoint(int(i->x), int(i->y) + 30), i->SignalToNoise);
 				index++;
 			}
 		}
@@ -232,6 +246,16 @@ void COperatorConsole3View::OnDraw(CDC* pDC)
 		brBkGnd.CreateSolidBrush(RGB(252, 255, 255));
 		int x = rc.Width() / 2 - 100;
 		int y = rc.Height() / 2;
+		if (m_shrinkDisplay)
+		{
+			x = x / m_zoomDivision;
+			y = y / m_zoomDivision;
+		}
+		else if (m_magnifyDisplay)
+		{
+			x = x * m_zoomMultiplier;
+			y = y * m_zoomMultiplier;
+		}
 		pDC->TextOut(x, y, "Testing for this imager is done - please open and replace with next");
 	}
 }
@@ -294,7 +318,7 @@ void COperatorConsole3View::InitPictureData()
 void COperatorConsole3View::OnInitialUpdate()
 {
 	CScrollView::OnInitialUpdate();
-	m_loggerFactor.getDefaultInstance()->AddTarget(new Logging::CLogTargetFile("OperatorConsole.log", Logging::LOG_LEVEL_DEBUG));
+	m_loggerFactory.getDefaultInstance()->AddTarget(new Logging::CLogTargetFile("OperatorConsole.log", Logging::LOG_LEVEL_DEBUG));
 	LOGMSG_DEBUG("Startup");
 	CSize sizeTotal;
 	// TODO: calculate the total size of this view
@@ -622,7 +646,7 @@ OperatorConsoleState COperatorConsole3View::HandleTesting1Camera(bool newState)
 			OnDraw(pDC);
 			ReleaseDC(pDC);
 #else
-			Invalidate();
+			Invalidate(FALSE);
 #endif
 			CheckIfSaveFrames(m_image8Data, m_image16DataTesting);
 
@@ -706,14 +730,14 @@ OperatorConsoleState COperatorConsole3View::HandleTesting2Camera(bool newState)
 			OnDraw(pDC);
 			ReleaseDC(pDC);
 #else
-			Invalidate();
+			Invalidate(FALSE);
 #endif
 			CheckIfSaveFrames(m_image8Data, m_image16Data);
 
 			if (makingAverage)
 			{
 				imageCount++;
-				if (imageCount < NUM_AVERAGE_IMAGES)
+				if (imageCount < m_numImagesToAverage)
 				{
 					LOGMSG_DEBUG("Averaging in fame " + std::to_string(m_FrameNumber));
 					// Add in the current image to the total
@@ -735,7 +759,7 @@ OperatorConsoleState COperatorConsole3View::HandleTesting2Camera(bool newState)
 					m_bFullChartMTF50Done = false;
 					LOGMSG_DEBUG("Setting m_bRunTestFullChartMTF50 to run and setting event");
 					std::wstring path = GetImagePath(L"FullChartMTF50");
-					SaveImage16ToFile(path.c_str(), m_image16Data);
+					SaveImage16ToFile(path.c_str(), m_image16DataTesting);
 					m_MatlabImageTestReadyEvent.SetEvent();
 				}
 			}
@@ -787,10 +811,11 @@ OperatorConsoleState COperatorConsole3View::HandleReportResults(bool newState)
 				pDC->TextOut(x, y, "Testing for this imager is done - please open and replace with next");
 				ReleaseDC(pDC);
 			}
-#else
-			Invalidate();
-#endif
 			CheckIfSaveFrames(m_image8Data, m_image16Data);
+#else
+			CheckIfSaveFrames(m_image8Data, m_image16Data);
+			Invalidate(FALSE);
+#endif
 		}
 		return SetProgramState(eStateReportResults);
 	}
@@ -852,7 +877,11 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 		while (!pThis->m_ThreadShutdown)
 		{
 			DWORD waitResult = WaitForMultipleObjects(2, handles, FALSE, INFINITE);
-			if ((WAIT_OBJECT_0+1) == waitResult)
+			if (WAIT_OBJECT_0 == waitResult)
+			{
+				pThis->m_ThreadShutdown = true;
+			}
+			else if ((WAIT_OBJECT_0+1) == waitResult)
 			{
 				::QueryPerformanceCounter(&timeStart);
 				LOGMSG_DEBUG("Received signal to run test");
@@ -865,8 +894,9 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 					AfxGetMainWnd()->SetWindowTextA("Running QuickMTF50");
 					pThis->m_DrawFocusTestResults = pThis->m_matlabTestCode.RunTestQuickMTF50(pThis->m_image8DataTesting, pThis->m_width, pThis->m_height, pThis->registrationCoordinates, pThis->m_outputQuickMTF50);
 					LOGMSG_DEBUG("After RunTestQuickMTF50 - " + std::to_string(pThis->m_DrawFocusTestResults));
-					if (pThis->m_DrawFocusTestResults)
+					if (pThis->m_DrawFocusTestResults && !pThis->m_ThreadShutdown)
 					{
+#if 0
 						if (pThis->OpenJSON(file, "FocusTest"))
 						{
 							pThis->WriteString(file, "{", false);
@@ -886,10 +916,11 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 							pThis->WriteString(file, "]", false);
 							pThis->WriteString(file, "}", false);
 						}
+#endif
 						pThis->m_bQuickMTF50Done = true;
 						AfxGetMainWnd()->SetWindowTextA("Success from QuickMTF50");
 					}
-					else
+					else if (!pThis->m_ThreadShutdown)
 					{
 						AfxGetMainWnd()->SetWindowTextA("Error from QuickMTF50");
 					}
@@ -902,7 +933,7 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 					AfxGetMainWnd()->SetWindowTextA("Running FullChartMTF50");
 					pThis->m_DrawFullChartMTF50 = pThis->m_matlabTestCode.RunTestFullChartMTF50(pThis->m_image16DataTesting, pThis->m_width, pThis->m_height, pThis->registrationCoordinates, pThis->m_outputFullChartMTF50);
 					LOGMSG_DEBUG("After RunTestFullChartMTF50 - " + std::to_string(pThis->m_DrawFullChartMTF50));
-					if (pThis->m_DrawFullChartMTF50)
+					if (pThis->m_DrawFullChartMTF50 && !pThis->m_ThreadShutdown)
 					{
 						if (pThis->OpenJSON(file, "FullChartMTF50"))
 						{
@@ -930,7 +961,7 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 						AfxGetMainWnd()->SetWindowTextA("Success from FullChartMTF50");
 						LOGMSG_DEBUG("Turning off m_bRunTestFullChartMTF50 and turning on m_bFullChartMTF50Done");
 					}
-					else
+					else if (!pThis->m_ThreadShutdown)
 					{
 						pThis->m_bFullChartMTF50Done = false;
 						pThis->m_bRunTestFullChartMTF50 = true;
@@ -945,7 +976,7 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 					AfxGetMainWnd()->SetWindowTextA("Running FullChartSNR");
 					pThis->m_DrawFullChartSNR = pThis->m_matlabTestCode.RunTestFullChartSNR(pThis->m_image16DataTesting, pThis->m_width, pThis->m_height, pThis->registrationCoordinates, pThis->m_outputFullChartSNR);
 					LOGMSG_DEBUG("After RunTestFullChartSNR - " + std::to_string(pThis->m_DrawFullChartSNR));
-					if (pThis->m_DrawFullChartSNR)
+					if (pThis->m_DrawFullChartSNR && !pThis->m_ThreadShutdown)
 					{
 						if (pThis->OpenJSON(file, "FullChartSNR"))
 						{
@@ -974,7 +1005,7 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 						AfxGetMainWnd()->SetWindowTextA("Success from FullChartSNR");
 						LOGMSG_DEBUG("Turning off m_bRunTestFullChartSNR and turning on m_bRunTestFullChartSNR");
 					}
-					else
+					else if (!pThis->m_ThreadShutdown)
 					{
 						pThis->m_bRunTestFullChartSNR = true;
 						pThis->m_bFullChartSNRDone = false;
@@ -1248,6 +1279,7 @@ void COperatorConsole3View::OnDestroy()
 	WaitForSingleObject(m_pProgramStateThread->m_hThread, INFINITE);
 	WaitForSingleObject(m_pTestingThread->m_hThread, INFINITE);
 	LOGMSG_DEBUG("Threads shut down, continue shutting down...");
+	m_loggerFactory.Close();
 	CScrollView::OnDestroy();
 }
 

@@ -58,7 +58,7 @@ protected:
 	void WriteAttrib(CFile &file, std::string name, double value, bool inQuotes = true, bool addComma = true);
 	void WriteAttrib(CFile& file, std::string name, int value, bool inQuotes = true, bool addComma = true);
 	bool GetFrame(std::vector<uint8_t>& image8Data, std::vector<uint16_t>& image16Data);
-	void DisplayFocusResult(CDC *pDC, int x, int y, double value);
+	void DisplayFocusResult(CDC *pDC, CPoint pt, double value);
 	CStringW UTF8toUTF16(const CStringA& utf8);
 	void DrawRegistrationPoint(CDC* pDC, int x, int y);
 	void InitPictureData();
@@ -94,7 +94,7 @@ protected:
 	std::vector<uint8_t> m_savedImageData;
 	DWORD m_sizeBitmapInfo;
 	std::string m_CameraID;
-	Logging::CLoggerFactory m_loggerFactor;
+	Logging::CLoggerFactory m_loggerFactory;
 	CWinThread* m_pProgramStateThread;
 	CWinThread* m_pTestingThread;
 	bool m_OperatorConsoleLockEngaged;
@@ -128,6 +128,7 @@ protected:
 	bool m_bFullChartMTF50Done;
 	bool m_bRunTestFullChartSNR;
 	bool m_bFullChartSNRDone;
+	int m_numImagesToAverage;
 	CEvent m_ShutdownEvent;
 	CEvent m_MatlabImageTestReadyEvent;
 	uint8_t m_maxPixelValueInSquare;
@@ -142,6 +143,7 @@ protected:
 	std::vector<CPoint> registrationCoordinates;
 	CameraInfoParser m_CameraInfo;
 	std::vector<CPoint> m_GreyBoxes;
+	std::vector<CPoint> m_FocusPoints;
 	// Output variables
 	std::vector<QuickMTF50Data> m_outputQuickMTF50;
 	std::vector<FullChartSNRData> m_outputFullChartSNR;
