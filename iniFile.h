@@ -135,6 +135,7 @@ public:
   bool SetValueB( string const keyname, string const valuename, bool const value, bool const create = true) {
     return SetValueI( keyname, valuename, int(value), create);
   }
+  bool SetValuePT(string const keyname, string const valuename, CPoint value, bool const create = true);
   bool SetValueF( string const keyname, string const valuename, double const value, bool const create = true);
   bool SetValueV( string const keyname, string const valuename, char *format, ...);
 

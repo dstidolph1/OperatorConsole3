@@ -269,16 +269,19 @@ bool MatlabTestCode::RunTestQuickMTF50(std::vector<uint8_t>& image, int width, i
 		unsigned long long imageHeight = height;
 		md::TypedArray<uint8_t> imageArray = factory.createArrayFromBuffer<uint8_t>({ imageHeight, imageWidth }, std::move(imageData), md::MemoryLayout::ROW_MAJOR);
 		std::vector<md::Array>params{ imageArray, xArray, yArray };
-		auto output = m_matlabLibrary->feval("quickMTF50", 1, params);
+		std::vector<matlab::data::Array> output = m_matlabLibrary->feval("quickMTF50", 1, params);
 		outputData.clear();
 		for (auto outputElement : output)
 		{
-			auto elements = outputElement.getNumberOfElements();
-			outputData.reserve(elements + outputData.capacity());
-			for (auto nElement = 0; nElement < elements; nElement++)
+			auto numElements = outputElement.getNumberOfElements();
+			size_t numRows = numElements / 3;
+			outputData.reserve(numElements + outputData.capacity());
+			for (auto nRow = 0; nRow < numRows; nRow++)
 			{
 				QuickMTF50Data data;
-				data.mtf50 = outputElement[nElement];
+				data.x = outputElement[nRow][0];
+				data.y = outputElement[nRow][1];
+				data.mtf50 = outputElement[nRow][2];
 				outputData.push_back(data);
 			}
 		}

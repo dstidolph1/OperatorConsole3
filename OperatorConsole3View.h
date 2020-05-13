@@ -51,6 +51,10 @@ public:
 	bool SwitchPressed();
 
 protected:
+	int DisplayToImage(int);
+	int ImageToDisplay(int num);
+	CPoint DisplayToImage(CPoint pt);
+	CPoint ImageToDisplay(CPoint pt);
 	void CheckIfSaveFrames(std::vector<uint8_t> &image8, std::vector<uint16_t> &image16);
 	bool OpenJSON(CFile& file, CString testName);
 	void WriteString(CFile& file, CString text, bool addComma = true);
@@ -60,7 +64,7 @@ protected:
 	bool GetFrame(std::vector<uint8_t>& image8Data, std::vector<uint16_t>& image16Data);
 	void DisplayFocusResult(CDC *pDC, CPoint pt, double value);
 	CStringW UTF8toUTF16(const CStringA& utf8);
-	void DrawRegistrationPoint(CDC* pDC, int x, int y);
+	void DrawRegistrationPoint(CDC* pDC, CPoint pt);
 	void InitPictureData();
 	bool LoadImage8ToFile(const char* filename);
 	void SaveImage8ToFile(const char* filename, std::vector<uint8_t>& image8);
@@ -105,6 +109,8 @@ protected:
 	bool m_CameraRunning;
 	bool m_SaveEveryFrame8;
 	bool m_SaveEveryFrame16;
+	int m_regPtMoving;
+	CPoint m_ptLastMovePt;
 	int m_SaveFrameCount;
 	int m_MaxSaveFrames;
 	int m_FrameNumber;

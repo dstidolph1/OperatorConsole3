@@ -244,6 +244,13 @@ bool CIniFile::SetValue( string const keyname, string const valuename, string co
   return true;
 }
 
+bool CIniFile::SetValuePT(string const keyname, string const valuename, CPoint value, bool const create)
+{
+    char svalue[MAX_VALUEDATA];
+    sprintf_s(svalue, sizeof(svalue), "%d,%d", value.x, value.y);
+    return SetValue(keyname, valuename, svalue);
+}
+
 bool CIniFile::SetValueI( string const keyname, string const valuename, int const value, bool const create)
 {
   char svalue[MAX_VALUEDATA];

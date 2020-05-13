@@ -29,7 +29,7 @@ using namespace Gdiplus;
 #endif
 
 // Global declaration
-
+#define REFERENCE_POINT_RADIUS 53
 //#define USE_SOFTWARE_FOR_STATION
 
 using _com_util::CheckError;
@@ -74,7 +74,7 @@ COperatorConsole3View::COperatorConsole3View() noexcept :
 	m_pBitmapInfo(nullptr), m_sizeBitmapInfo(0), m_OperatorConsoleLockEngaged(false),
 	m_OperatorConsoleSwitchPressed(false), m_CameraRunning(false), m_ProgramStateThreadRunning(false),
 	m_ThreadShutdown(false), m_SaveEveryFrame8(false),
-	m_SaveEveryFrame16(false), m_DrawRegistrationMarks(false), m_zoomDivision(1),
+	m_SaveEveryFrame16(false), m_DrawRegistrationMarks(true), m_zoomDivision(1),
 	m_zoomMultiplier(1), m_shrinkDisplay(false), m_magnifyDisplay(false),
 	m_width(PICTURE_WIDTH), m_height(PICTURE_HEIGHT), m_maxPixelValueInSquare(0), m_FrameNumber(0),
 	m_MaxSaveFrames(10), m_RunFocusTest(false), m_pBitmapInfoSaved(nullptr), m_ShutdownEvent(FALSE, TRUE, NULL, NULL),
@@ -82,7 +82,7 @@ COperatorConsole3View::COperatorConsole3View() noexcept :
 	m_bCX3ButonPressed(false), m_bRunTestQuickMTF50(false), m_bRunTestFullChartMTF50(false), m_bRunTestFullChartSNR(false),
 	m_DrawFullChartMTF50(false), m_DrawFullChartSNR(false), m_bFullChartMTF50Done(false), m_bFullChartSNRDone(false),
 	m_bQuickMTF50Done(false), m_stateChange(false), m_TestingThreadRunning(false),
-	m_pProgramStateThread(nullptr), m_pTestingThread(nullptr)
+	m_pProgramStateThread(nullptr), m_pTestingThread(nullptr), m_numImagesToAverage(20), m_regPtMoving(-1)
 {
 	// TODO: add construction code here
 	::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
@@ -133,43 +133,82 @@ void COperatorConsole3View::DisplayFocusResult(CDC* pDC, CPoint pt, double value
 {
 	CString sValue;
 	sValue.Format("%.1f",value);
-	int x = pt.x;
-	int y = pt.y;
-	if (m_shrinkDisplay)
-	{
-		x = x / m_zoomDivision;
-		y = y / m_zoomDivision;
-	}
-	else if (m_magnifyDisplay)
-	{
-		x = x * m_zoomMultiplier;
-		y = y * m_zoomMultiplier;
-	}
-
-	pDC->TextOut(x, y, sValue.GetString());
+	CPoint ptScreen = ImageToDisplay(pt);
+	pDC->TextOut(ptScreen.x, ptScreen.y, sValue.GetString());
 }
 
-void COperatorConsole3View::DrawRegistrationPoint(CDC *pDC, int x, int y)
+int COperatorConsole3View::DisplayToImage(int num)
 {
-	int radius = 53;
 	if (m_shrinkDisplay)
 	{
-		radius = radius / m_zoomDivision;
-		x = x / m_zoomDivision;
-		y = y / m_zoomDivision;
+		num = num * m_zoomDivision;
 	}
 	else if (m_magnifyDisplay)
 	{
-		radius = radius * m_zoomMultiplier;
-		x = x * m_zoomMultiplier;
-		y = y * m_zoomMultiplier;
+		num = num / m_zoomMultiplier;
 	}
+	return num;
+}
 
-	pDC->Ellipse(x - radius, y - radius, x + radius, y + radius);
-	pDC->MoveTo(x, y - radius);
-	pDC->LineTo(x, y + radius);
-	pDC->MoveTo(x - radius, y);
-	pDC->LineTo(x + radius, y);
+int COperatorConsole3View::ImageToDisplay(int num)
+{
+	if (m_shrinkDisplay)
+	{
+		num = num / m_zoomDivision;
+	}
+	else if (m_magnifyDisplay)
+	{
+		num = num * m_zoomMultiplier;
+	}
+	return num;
+}
+
+CPoint COperatorConsole3View::DisplayToImage(CPoint pt)
+{
+	CPoint returnPt;
+	if (m_shrinkDisplay)
+	{
+		returnPt.x = pt.x * m_zoomDivision;
+		returnPt.y = pt.y * m_zoomDivision;
+	}
+	else if (m_magnifyDisplay)
+	{
+		returnPt.x = pt.x / m_zoomMultiplier;
+		returnPt.y = pt.y / m_zoomMultiplier;
+	}
+	else
+		returnPt = pt;
+	return returnPt;
+}
+
+CPoint COperatorConsole3View::ImageToDisplay(CPoint pt)
+{
+	CPoint returnPt;
+	if (m_shrinkDisplay)
+	{
+		returnPt.x = pt.x / m_zoomDivision;
+		returnPt.y = pt.y / m_zoomDivision;
+	}
+	else if (m_magnifyDisplay)
+	{
+		returnPt.x = pt.x * m_zoomMultiplier;
+		returnPt.y = pt.y * m_zoomMultiplier;
+	}
+	else
+		returnPt = pt;
+	return returnPt;
+}
+
+void COperatorConsole3View::DrawRegistrationPoint(CDC *pDC, CPoint pt)
+{
+	int radius = ImageToDisplay(REFERENCE_POINT_RADIUS);
+	CPoint ptScreen = ImageToDisplay(pt);
+
+	pDC->Ellipse(ptScreen.x - radius, ptScreen.y - radius, ptScreen.x + radius, ptScreen.y + radius);
+	pDC->MoveTo(ptScreen.x, ptScreen.y - radius);
+	pDC->LineTo(ptScreen.x, ptScreen.y + radius);
+	pDC->MoveTo(ptScreen.x - radius, ptScreen.y);
+	pDC->LineTo(ptScreen.x + radius, ptScreen.y);
 }
 
 // COperatorConsole3View drawing
@@ -201,7 +240,7 @@ void COperatorConsole3View::OnDraw(CDC* pDC)
 		HGDIOBJ originalBrush = pDC->SelectObject(GetStockObject(HOLLOW_BRUSH));
 		pDC->SetDCPenColor(RGB(0, 255, 0));
 		for(auto i = registrationCoordinates.begin(); i != registrationCoordinates.end(); i++)
-			DrawRegistrationPoint(pDC, i->x, i->y);
+			DrawRegistrationPoint(pDC, *i);
 		pDC->SelectObject(originalPen);
 		pDC->SelectObject(originalBrush);
 	}
@@ -213,8 +252,8 @@ void COperatorConsole3View::OnDraw(CDC* pDC)
 		double average = total / double(m_outputQuickMTF50.size());
 
 		for(int i=0; i< m_FocusPoints.size(); i++)
-			DisplayFocusResult(pDC, m_FocusPoints[i], m_outputQuickMTF50[i].mtf50);
-		DisplayFocusResult(pDC, CPoint((m_width / 2), (m_height / 2)), average);
+			DisplayFocusResult(pDC, CPoint(int(m_outputQuickMTF50[i].x), int(m_outputQuickMTF50[i].y)), m_outputQuickMTF50[i].mtf50);
+		DisplayFocusResult(pDC, CPoint(1032, 974), average);
 	}
 	else if (m_DrawFullChartMTF50 && !m_outputFullChartMTF50.empty())
 	{
@@ -244,19 +283,9 @@ void COperatorConsole3View::OnDraw(CDC* pDC)
 		GetClientRect(&rc);
 		CBrush brBkGnd;
 		brBkGnd.CreateSolidBrush(RGB(252, 255, 255));
-		int x = rc.Width() / 2 - 100;
-		int y = rc.Height() / 2;
-		if (m_shrinkDisplay)
-		{
-			x = x / m_zoomDivision;
-			y = y / m_zoomDivision;
-		}
-		else if (m_magnifyDisplay)
-		{
-			x = x * m_zoomMultiplier;
-			y = y * m_zoomMultiplier;
-		}
-		pDC->TextOut(x, y, "Testing for this imager is done - please open and replace with next");
+		CPoint pt(m_width / 2 - 200, m_height / 2);
+		CPoint ptScreen = ImageToDisplay(pt);
+		pDC->TextOut(ptScreen.x, ptScreen.y, "Testing for this imager is done - please open and replace with next");
 	}
 }
 
@@ -1383,23 +1412,64 @@ void COperatorConsole3View::OnCameraSaveSequenceToDisk()
 
 afx_msg void COperatorConsole3View::OnMouseMove(UINT nFlags, CPoint point)
 {
-
 	if (m_CameraRunning)
 	{
 		CString text;
 		int color = -1;
 		CPoint ptScroll = GetDeviceScrollPosition();
-		point += ptScroll;
-		if ((point.y >= 0) && (point.y <= m_height))
+		CPoint ptScreen = ptScroll + point;
+		if ((ptScreen.y >= 0) && (ptScreen.y <= m_height))
 		{
-			if ((point.x >= 0) && (point.x <= m_width))
+			if ((ptScreen.x >= 0) && (ptScreen.x <= m_width))
 			{
-				int offset = point.y * m_width + point.x;
+				int offset = ptScreen.y * m_width + ptScreen.x;
 				color = m_image8Data[offset];
 			}
 		}
 		text.Format("Color %d at %d,%d - highest pixel value in white square = %d", color, point.x, point.y, m_maxPixelValueInSquare);
 		SetStatusBarText(text);
+
+		if (MK_LBUTTON & nFlags)
+		{
+			CPoint ptClient = point + ptScroll;
+			CPoint ptImage = DisplayToImage(ptClient);
+			// Left Button Down
+			if (-1 == m_regPtMoving)
+			{
+				// We are, possibly, starting a move
+				int n = 0;
+				for (auto i = registrationCoordinates.begin(); i != registrationCoordinates.end(); i++, n++)
+				{
+					CRect rc(i->x - REFERENCE_POINT_RADIUS, i->y - REFERENCE_POINT_RADIUS, i->x + REFERENCE_POINT_RADIUS, i->y + REFERENCE_POINT_RADIUS);
+					if (rc.PtInRect(ptImage))
+					{
+						m_regPtMoving = n;
+						m_ptLastMovePt = ptImage;
+						break;
+					}
+				}
+			}
+			else
+			{
+				// Ok, we ARE doing a registration point move...
+				CPoint offset = ptImage - m_ptLastMovePt;
+				registrationCoordinates[m_regPtMoving].Offset(offset);
+				m_ptLastMovePt = ptImage;
+			}
+		}
+		else
+		{
+			// Left Button Up
+			if (-1 != m_regPtMoving)
+			{
+				for (size_t i = 0; i < registrationCoordinates.size(); i++)
+				{
+					prop.m_Fiducials[i] = registrationCoordinates[i];
+				}
+				prop.Save();
+				m_regPtMoving = -1;
+			}
+		}
 	}
 	CScrollView::OnMouseMove(nFlags, point);
 }

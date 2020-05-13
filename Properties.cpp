@@ -130,6 +130,9 @@ bool CProperties::Create()
         case T_FLOAT:
             ini.SetValueF((LPCTSTR)it->key, (LPCTSTR)it->valname, it->defFloat);
             break;
+        case T_POINT:
+            ini.SetValuePT((LPCTSTR)it->key, (LPCTSTR)it->valname, it->defPt);
+            break;
         }
     }
     return ini.WriteFile();
@@ -158,6 +161,8 @@ bool CProperties::Save()
             case T_FLOAT:
                 ini.SetValueF((LPCTSTR)it->key, (LPCTSTR)it->valname, *(double*)(it->value));
                 break;
+            case T_POINT:
+                ini.SetValuePT((LPCTSTR)it->key, (LPCTSTR)it->valname, *(CPoint*)(it->value));
             }
         }
 

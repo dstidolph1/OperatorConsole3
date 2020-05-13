@@ -26,6 +26,8 @@ typedef struct
 
 typedef struct
 {
+	double x;
+	double y;
 	double mtf50;
 } QuickMTF50Data;
 
