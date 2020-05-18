@@ -10,6 +10,7 @@ namespace md = matlab::data;
 
 typedef struct
 {
+	double edge;
 	double x;
 	double y;
 	double mtf50;
@@ -17,6 +18,7 @@ typedef struct
 
 typedef struct
 {
+	double grayBox;
 	double x;
 	double y;
 	double meanIntensity;

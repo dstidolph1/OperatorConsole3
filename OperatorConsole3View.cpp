@@ -526,6 +526,22 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 	if (newState)
 	{
 		LOGMSG_DEBUG("Enter newState");
+		if (prop.Load())
+		{
+			size_t nFiducials = prop.m_Fiducials.size();
+			registrationCoordinates.resize(nFiducials);
+			for (size_t i = 0; i < nFiducials; i++)
+			{
+				registrationCoordinates[i] = prop.m_Fiducials[i];
+			}
+			m_numImagesToAverage = prop.m_NumImagesAverage;
+			size_t nFocusPoints = prop.m_QuickPoints.size();
+			m_FocusPoints.resize(nFocusPoints);
+			for (size_t i = 0; i < nFocusPoints; i++)
+			{
+				m_FocusPoints[i] = prop.m_QuickPoints[i];
+			}
+		}
 		m_DrawFocusTestResults = true;
 		m_DrawFullChartMTF50 = false;
 		m_DrawFullChartSNR = false;
@@ -976,6 +992,7 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 							{
 								pThis->WriteString(file, "{", false);
 								pThis->WriteAttrib(file, "TestID", index, true, true);
+								pThis->WriteAttrib(file, "Edge", int(i->edge), true, true);
 								pThis->WriteAttrib(file, "X", int(i->x), true, true);
 								pThis->WriteAttrib(file, "Y", int(i->y), true, true);
 								pThis->WriteAttrib(file, "MFTF50", i->mtf50, true, false);
@@ -1019,6 +1036,7 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 							{
 								pThis->WriteString(file, "{", false); // no comma on start of struct item
 								pThis->WriteAttrib(file, "TestID", index, true, true);
+								pThis->WriteAttrib(file, "GrayBox", int(i->grayBox), true, true);
 								pThis->WriteAttrib(file, "X", int(i->x), true, true);
 								pThis->WriteAttrib(file, "Y", int(i->y), true, true);
 								pThis->WriteAttrib(file, "meanIntensity", i->meanIntensity, true, true);

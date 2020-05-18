@@ -80,14 +80,16 @@ bool MatlabTestCode::RunTestFullChartMTF50(std::vector<uint16_t>& image, int wid
 		for (auto outputElement : output)
 		{
 			size_t numElements = outputElement.getNumberOfElements();
-			size_t numRows = numElements / 3;
+			LOGMSG_INFO("fullChartMTF50 getNumberOfElements returned %d", int(numElements));
+			size_t numRows = numElements / 4;
 			outputData.reserve(numElements + outputData.capacity());
 			for (auto nRow = 0; nRow < numRows; nRow++)
 			{
 				FullChartMTF50Data data;
-				data.x = outputElement[nRow][0];
-				data.y = outputElement[nRow][1];
-				data.mtf50 = outputElement[nRow][2];
+				data.edge = outputElement[nRow][0];
+				data.x = outputElement[nRow][1];
+				data.y = outputElement[nRow][2];
+				data.mtf50 = outputElement[nRow][3];
 				outputData.push_back(data);
 			}
 		}
@@ -178,17 +180,19 @@ bool MatlabTestCode::RunTestFullChartSNR(std::vector<uint16_t>& image, int width
 		for (auto outputElement : output) // process vector of 20 rows
 		{
 			size_t numElements = outputElement.getNumberOfElements(); // Should be 5
-			size_t numRows = numElements / 5;
+			LOGMSG_INFO("fullChartSNR getNumberOfElements returned %d", int(numElements));
+			size_t numRows = numElements / 6;
 			md::ArrayType A1 = outputElement.getType();
 			outputData.reserve(numElements + outputData.capacity());
 			for (auto nRow = 0; nRow < numRows; nRow++)
 			{
 				FullChartSNRData data;
-				data.x = outputElement[nRow][0];
-				data.y = outputElement[nRow][1];
-				data.meanIntensity = outputElement[nRow][2];
-				data.RMSNoise = outputElement[nRow][3];
-				data.SignalToNoise = outputElement[nRow][4];
+				data.grayBox = outputElement[nRow][0];
+				data.x = outputElement[nRow][1];
+				data.y = outputElement[nRow][2];
+				data.meanIntensity = outputElement[nRow][3];
+				data.RMSNoise = outputElement[nRow][4];
+				data.SignalToNoise = outputElement[nRow][5];
 				outputData.push_back(data);
 			}
 		}
