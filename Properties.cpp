@@ -61,6 +61,7 @@ CProperties::CProperties()
     m_proplist.push_back(t_props("Fiducials", "PT3", CPoint(1810, 1375), &m_Fiducials[2]));
     m_proplist.push_back(t_props("Fiducials", "PT4", CPoint(763, 1370), &m_Fiducials[3]));
     m_proplist.push_back(t_props("Settings", "NumAverage", 20, &m_NumImagesAverage));
+    m_proplist.push_back(t_props("Fiducials", "Radius", 67, &m_FiducialRadius));
     m_QuickPoints.resize(5);
     m_proplist.push_back(t_props("Focus", "PT1", CPoint(1201, 515), &m_QuickPoints[0]));
     m_proplist.push_back(t_props("Focus", "PT2", CPoint(815, 880), &m_QuickPoints[1]));

@@ -116,6 +116,7 @@ protected:
 	int m_FrameNumber;
 	int m_width;
 	int m_height;
+	int m_registrationPointsRadius;
 	int m_zoomDivision;
 	int m_zoomMultiplier;
 	bool m_shrinkDisplay;

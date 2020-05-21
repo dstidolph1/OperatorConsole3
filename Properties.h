@@ -31,6 +31,7 @@ public:
     std::vector<CPoint> m_Fiducials;
     int m_NumImagesAverage;
     std::vector<CPoint> m_QuickPoints;
+    int m_FiducialRadius;
 
 private:
     bool GetPoint(CString text, CPoint &pt);

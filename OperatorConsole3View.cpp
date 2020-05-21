@@ -94,6 +94,7 @@ COperatorConsole3View::COperatorConsole3View() noexcept :
 		{
 			registrationCoordinates[i] = prop.m_Fiducials[i];
 		}
+		m_registrationPointsRadius = prop.m_FiducialRadius;
 		m_numImagesToAverage = prop.m_NumImagesAverage;
 		size_t nFocusPoints = prop.m_QuickPoints.size();
 		m_FocusPoints.resize(nFocusPoints);
@@ -101,6 +102,7 @@ COperatorConsole3View::COperatorConsole3View() noexcept :
 		{
 			m_FocusPoints[i] = prop.m_QuickPoints[i];
 		}
+
 	}
 	else
 	{
@@ -134,7 +136,11 @@ void COperatorConsole3View::DisplayFocusResult(CDC* pDC, CPoint pt, double value
 	CString sValue;
 	sValue.Format("%.1f",value);
 	CPoint ptScreen = ImageToDisplay(pt);
-	pDC->TextOut(ptScreen.x, ptScreen.y, sValue.GetString());
+	CSize szText;
+	GetTextExtentPoint32(pDC->GetSafeHdc(), sValue.GetString(), sValue.GetLength(), &szText);
+	int x = pt.x - (szText.cx / 2);
+	int y = pt.y - (szText.cy / 2);
+	pDC->TextOut(x, y, sValue.GetString());
 }
 
 int COperatorConsole3View::DisplayToImage(int num)
@@ -201,7 +207,7 @@ CPoint COperatorConsole3View::ImageToDisplay(CPoint pt)
 
 void COperatorConsole3View::DrawRegistrationPoint(CDC *pDC, CPoint pt)
 {
-	int radius = ImageToDisplay(REFERENCE_POINT_RADIUS);
+	int radius = ImageToDisplay(m_registrationPointsRadius);
 	CPoint ptScreen = ImageToDisplay(pt);
 
 	pDC->Ellipse(ptScreen.x - radius, ptScreen.y - radius, ptScreen.x + radius, ptScreen.y + radius);
@@ -253,7 +259,9 @@ void COperatorConsole3View::OnDraw(CDC* pDC)
 
 		for(int i=0; i< m_FocusPoints.size(); i++)
 			DisplayFocusResult(pDC, CPoint(int(m_outputQuickMTF50[i].x), int(m_outputQuickMTF50[i].y)), m_outputQuickMTF50[i].mtf50);
-		DisplayFocusResult(pDC, CPoint(1032, 974), average);
+		int x = (registrationCoordinates[1].x - registrationCoordinates[0].x) / 2 + registrationCoordinates[0].x;
+		int y = (registrationCoordinates[3].y - registrationCoordinates[0].y) / 2 + registrationCoordinates[0].y;
+		DisplayFocusResult(pDC, CPoint(x, y), average);
 	}
 	else if (m_DrawFullChartMTF50 && !m_outputFullChartMTF50.empty())
 	{
