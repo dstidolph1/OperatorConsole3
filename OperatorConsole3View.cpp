@@ -29,8 +29,8 @@ using namespace Gdiplus;
 #endif
 
 // Global declaration
-#define REFERENCE_POINT_RADIUS 53
 //#define USE_SOFTWARE_FOR_STATION
+#define DRAW_MAIN_THREAD
 
 using _com_util::CheckError;
 using container = std::vector<std::vector<bool>>;
@@ -82,7 +82,8 @@ COperatorConsole3View::COperatorConsole3View() noexcept :
 	m_bCX3ButonPressed(false), m_bRunTestQuickMTF50(false), m_bRunTestFullChartMTF50(false), m_bRunTestFullChartSNR(false),
 	m_DrawFullChartMTF50(false), m_DrawFullChartSNR(false), m_bFullChartMTF50Done(false), m_bFullChartSNRDone(false),
 	m_bQuickMTF50Done(false), m_stateChange(false), m_TestingThreadRunning(false),
-	m_pProgramStateThread(nullptr), m_pTestingThread(nullptr), m_numImagesToAverage(20), m_regPtMoving(-1)
+	m_pProgramStateThread(nullptr), m_pTestingThread(nullptr), m_numImagesToAverage(20), m_regPtMoving(-1),
+	m_ShowInstallDiffusionFilter(false), m_ShowRemoveDiffusionFilter(false), m_ShowTestingDiffusionFilter(false)
 {
 	// TODO: add construction code here
 	::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
@@ -131,16 +132,21 @@ BOOL COperatorConsole3View::PreCreateWindow(CREATESTRUCT& cs)
 	return CScrollView::PreCreateWindow(cs);
 }
 
+void COperatorConsole3View::DisplayText(CDC* pDC, CPoint pt, CString text)
+{
+	CPoint ptScreen = ImageToDisplay(pt);
+	CSize szText;
+	GetTextExtentPoint32(pDC->GetSafeHdc(), text.GetString(), text.GetLength(), &szText);
+	int x = ptScreen.x - (szText.cx / 2);
+	int y = ptScreen.y - (szText.cy / 2);
+	pDC->TextOut(x, y, text.GetString());
+}
+
 void COperatorConsole3View::DisplayFocusResult(CDC* pDC, CPoint pt, double value)
 {
 	CString sValue;
 	sValue.Format("%.1f",value);
-	CPoint ptScreen = ImageToDisplay(pt);
-	CSize szText;
-	GetTextExtentPoint32(pDC->GetSafeHdc(), sValue.GetString(), sValue.GetLength(), &szText);
-	int x = pt.x - (szText.cx / 2);
-	int y = pt.y - (szText.cy / 2);
-	pDC->TextOut(x, y, sValue.GetString());
+	DisplayText(pDC, pt, sValue);
 }
 
 int COperatorConsole3View::DisplayToImage(int num)
@@ -285,6 +291,33 @@ void COperatorConsole3View::OnDraw(CDC* pDC)
 			}
 		}
 	}
+	else if (m_ShowInstallDiffusionFilter)
+	{
+		CRect rcClient;
+		GetClientRect(&rcClient);
+		CPoint pt(rcClient.Width() / 2, rcClient.Height() / 2);
+		pt = DisplayToImage(pt);
+		pt += GetDeviceScrollPosition();
+		DisplayText(pDC, pt, "Please install diffusion filter");
+	}
+	else if (m_ShowRemoveDiffusionFilter)
+	{
+		CRect rcClient;
+		GetClientRect(&rcClient);
+		CPoint pt(rcClient.Width() / 2, rcClient.Height() / 2);
+		pt = DisplayToImage(pt);
+		pt += GetDeviceScrollPosition();
+		DisplayText(pDC, pt, "Please Remove diffusion filter");
+	}
+	else if (m_ShowTestingDiffusionFilter)
+	{
+		CRect rcClient;
+		GetClientRect(&rcClient);
+		CPoint pt(rcClient.Width() / 2, rcClient.Height() / 2);
+		pt = DisplayToImage(pt);
+		pt += GetDeviceScrollPosition();
+		DisplayText(pDC, pt, "Testing image with diffusion filter - please wait");
+	}
 	else if (m_programState == eStateReportResults)
 	{
 		CRect rc;
@@ -425,6 +458,9 @@ OperatorConsoleState COperatorConsole3View::SetProgramState(OperatorConsoleState
 		case eStateFocusingCamera: text += "Please focus camera and press button when ready"; break;
 		case eStateTesting1Camera: text += "Running Signal-To-Noise Ratio test"; break;
 		case eStateTesting2Camera: text += "Building average image and running full MTF50 test"; break;
+		case eStateWaitForDiffusionFilter: text += "Please install diffusion filter"; break;
+		case eStateTestingDiffusionFilter: text += "Building average image and running diffusion test"; break;
+		case eStateWaitRemoveDiffusionFilter: text += "Please remove diffusion filter"; break;
 		case eStateReportResults: text += "Done with tests - please open/close magnetic lock and test new camera"; break;
 		default: text += "Unknown state: " + std::to_string(nextState); break;
 		}
@@ -579,11 +615,11 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 			if (GetFrame(m_image8Data, m_image16Data))
 			{
 #if defined(DRAW_MAIN_THREAD)
+				Invalidate(FALSE);
+#else
 				CDC* pDC = GetDC();
 				OnDraw(pDC);
 				ReleaseDC(pDC);
-#else
-				Invalidate(FALSE);
 #endif
 				if (!m_ActiveTestRunning)
 				{
@@ -694,12 +730,12 @@ OperatorConsoleState COperatorConsole3View::HandleTesting1Camera(bool newState)
 				m_bFullChartSNRDone = false;
 			}
 #if defined(DRAW_MAIN_THREAD)
+			Invalidate(FALSE);
+#else
 			// Draw video frame
 			CDC* pDC = GetDC();
 			OnDraw(pDC);
 			ReleaseDC(pDC);
-#else
-			Invalidate(FALSE);
 #endif
 			CheckIfSaveFrames(m_image8Data, m_image16DataTesting);
 
@@ -779,11 +815,11 @@ OperatorConsoleState COperatorConsole3View::HandleTesting2Camera(bool newState)
 		if (frameValid)
 		{
 #if defined(DRAW_MAIN_THREAD)
+			Invalidate(FALSE);
+#else
 			CDC* pDC = GetDC();
 			OnDraw(pDC);
 			ReleaseDC(pDC);
-#else
-			Invalidate(FALSE);
 #endif
 			CheckIfSaveFrames(m_image8Data, m_image16Data);
 
@@ -818,7 +854,7 @@ OperatorConsoleState COperatorConsole3View::HandleTesting2Camera(bool newState)
 			}
 			else if (m_bFullChartMTF50Done)
 			{
-				return SetProgramState(eStateReportResults);
+				return SetProgramState(eStateWaitForDiffusionFilter);
 			}
 			else if (!m_ActiveTestRunning)
 			{
@@ -833,6 +869,137 @@ OperatorConsoleState COperatorConsole3View::HandleTesting2Camera(bool newState)
 	return SetProgramState(eStateWaitForCameraLock); // back to beginning
 }
 
+OperatorConsoleState COperatorConsole3View::HandleWaitForDiffusionFilter(bool newState)
+{
+	static int countDiffusionFilterDetected = 0;
+	if (MagLockEngaged())
+	{
+		if (newState)
+		{
+			m_DrawFocusTestResults = false;
+			m_DrawFullChartSNR = false;
+			m_DrawFullChartMTF50 = false;
+			m_ShowInstallDiffusionFilter = true;
+			m_ShowRemoveDiffusionFilter = false;
+			m_ShowTestingDiffusionFilter = false;
+			countDiffusionFilterDetected = 0;
+		}
+		bool frameValid = GetFrame(m_image8Data, m_image16Data);
+		if (frameValid)
+		{
+			CheckIfSaveFrames(m_image8Data, m_image16Data);
+			Invalidate(FALSE);
+			int totalPixelValue = 0;
+			for (auto i = m_image8Data.begin(); i != m_image8Data.end(); i++)
+				totalPixelValue += *i;
+			int averagePixel = totalPixelValue / int(m_image8Data.size());
+			if ((averagePixel > prop.m_MinDiffusionValue) && (averagePixel < prop.m_MaxDiffusionValue))
+			{
+				countDiffusionFilterDetected++;
+				if (countDiffusionFilterDetected >= prop.m_CountDiffusionFilterValid)
+					return SetProgramState(eStateTestingDiffusionFilter);
+			}
+		}
+		return SetProgramState(eStateWaitForDiffusionFilter);
+	}
+	else
+		return SetProgramState(eStateWaitForCameraLock); // back to beginning
+}
+
+OperatorConsoleState COperatorConsole3View::HandleTestWithDiffusionFilter(bool newState)
+{
+	static int imageCount = 0;
+	static bool makingAverage = false;
+	if (MagLockEngaged())
+	{
+		if (newState)
+		{
+			m_DrawFocusTestResults = false;
+			m_DrawFullChartSNR = false;
+			m_DrawFullChartMTF50 = false;
+			m_ShowInstallDiffusionFilter = false;
+			m_ShowRemoveDiffusionFilter = false;
+			m_ShowTestingDiffusionFilter = true;
+			m_bRunDiffusionTest = false;
+			m_bDiffusionTestDone = false;
+			imageCount = 0;
+			memset(&m_image32Average[0], 0, sizeof(m_image32Average[0]) * m_image32Average.size());
+			makingAverage = true;
+		}
+		bool frameValid = GetFrame(m_image8Data, m_image16Data);
+		if (frameValid)
+		{
+			CheckIfSaveFrames(m_image8Data, m_image16Data);
+			Invalidate(FALSE);
+			// build average image
+			if (imageCount < prop.m_NumDiffusionImagesToAverage)
+			{
+				LOGMSG_DEBUG("Averaging in fame " + std::to_string(m_FrameNumber));
+				// Add in the current image to the total
+				for (size_t i = 0; i < m_image16Data.size(); i++)
+				{
+					m_image32Average[i] += m_image16Data[i];
+				}
+				imageCount++;
+				return SetProgramState(eStateTestingDiffusionFilter); // return back here for more averaging
+			}
+			else
+			{
+				LOGMSG_DEBUG("Build average frame, now test");
+				// Compute the average
+				makingAverage = false;
+				for (size_t i = 0; i < m_image32Average.size(); i++)
+				{
+					m_image16DataTesting[i] = m_image32Average[i] / imageCount;
+				}
+				LOGMSG_DEBUG("Saving Diffusion Test average image");
+				std::wstring path = GetImagePath(L"DiffusionTest");
+				SaveImage16ToFile(path.c_str(), m_image16DataTesting);
+				return SetProgramState(eStateWaitRemoveDiffusionFilter);
+			}
+		}
+	}
+	else
+		return SetProgramState(eStateWaitForCameraLock); // back to beginning
+}
+
+OperatorConsoleState COperatorConsole3View::HandleWaitForRemovalOfDiffusionFilter(bool newState)
+{
+	static int countDiffusionFilterNotDetected = 0;
+	if (MagLockEngaged())
+	{
+		if (newState)
+		{
+			m_DrawFocusTestResults = false;
+			m_DrawFullChartSNR = false;
+			m_DrawFullChartMTF50 = false;
+			m_ShowInstallDiffusionFilter = false;
+			m_ShowRemoveDiffusionFilter = true;
+			m_ShowTestingDiffusionFilter = false;
+			countDiffusionFilterNotDetected = 0;
+		}
+		bool frameValid = GetFrame(m_image8Data, m_image16Data);
+		if (frameValid)
+		{
+			CheckIfSaveFrames(m_image8Data, m_image16Data);
+			Invalidate(FALSE);
+			int totalPixelValue = 0;
+			for (auto i = m_image8Data.begin(); i != m_image8Data.end(); i++)
+				totalPixelValue += *i;
+			int averagePixel = totalPixelValue / int(m_image8Data.size());
+			if (averagePixel > prop.m_MaxDiffusionValue)
+			{
+				countDiffusionFilterNotDetected++;
+				if (countDiffusionFilterNotDetected >= prop.m_CountDiffusionFilterValid)
+					return SetProgramState(eStateReportResults);
+			}
+		}
+		return SetProgramState(eStateWaitRemoveDiffusionFilter);
+	}
+	else
+		return SetProgramState(eStateWaitForCameraLock); // back to beginning
+}
+
 OperatorConsoleState COperatorConsole3View::HandleReportResults(bool newState)
 {
 	if (MagLockEngaged())
@@ -843,6 +1010,9 @@ OperatorConsoleState COperatorConsole3View::HandleReportResults(bool newState)
 			m_DrawFocusTestResults = false;
 			m_DrawFullChartMTF50 = false;
 			m_DrawFullChartSNR = false;
+			m_ShowInstallDiffusionFilter = false;
+			m_ShowRemoveDiffusionFilter = false;
+			m_ShowTestingDiffusionFilter = false;
 			m_RunFocusTest = false;
 			m_bRunTestQuickMTF50 = false;
 			m_bFullChartSNRDone = false;
@@ -851,6 +1021,8 @@ OperatorConsoleState COperatorConsole3View::HandleReportResults(bool newState)
 		if (frameValid)
 		{
 #if defined(DRAW_MAIN_THREAD)
+			Invalidate(FALSE);
+#else
 			CDC* pDC = GetDC();
 			if (pDC)
 			{
@@ -863,11 +1035,8 @@ OperatorConsoleState COperatorConsole3View::HandleReportResults(bool newState)
 				int y = rc.Height() / 2;
 				pDC->TextOut(x, y, "Testing for this imager is done - please open and replace with next");
 				ReleaseDC(pDC);
-			}
+		}
 			CheckIfSaveFrames(m_image8Data, m_image16Data);
-#else
-			CheckIfSaveFrames(m_image8Data, m_image16Data);
-			Invalidate(FALSE);
 #endif
 		}
 		return SetProgramState(eStateReportResults);
@@ -1068,6 +1237,11 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 						LOGMSG_DEBUG("Error running RunTestFullChartSNR");
 					}
 				}
+				else if (pThis->m_bRunDiffusionTest)
+				{
+					pThis->m_bDiffusionTestDone = true;
+					LOGMSG_DEBUG("RunTestDiffusion");
+				}
 				else
 				{
 					LOGMSG_DEBUG("No test set to runrun");
@@ -1122,6 +1296,15 @@ UINT __cdecl COperatorConsole3View::ThreadProc(LPVOID pParam)
 				break;
 			case eStateTesting2Camera:
 				nextState = pThis->HandleTesting2Camera(pThis->m_stateChange);
+				break;
+			case eStateWaitForDiffusionFilter:
+				nextState = pThis->HandleWaitForDiffusionFilter(pThis->m_stateChange);
+				break;
+			case eStateTestingDiffusionFilter:
+				nextState = pThis->HandleTestWithDiffusionFilter(pThis->m_stateChange);
+				break;
+			case eStateWaitRemoveDiffusionFilter:
+				nextState = pThis->HandleWaitForRemovalOfDiffusionFilter(pThis->m_stateChange);
 				break;
 			case eStateReportResults:
 				nextState = pThis->HandleReportResults(pThis->m_stateChange);
@@ -1442,23 +1625,25 @@ afx_msg void COperatorConsole3View::OnMouseMove(UINT nFlags, CPoint point)
 	{
 		CString text;
 		int color = -1;
+		CPoint ptImage = DisplayToImage(point);
 		CPoint ptScroll = GetDeviceScrollPosition();
-		CPoint ptScreen = ptScroll + point;
-		if ((ptScreen.y >= 0) && (ptScreen.y <= m_height))
+		ptImage += ptScroll;
+		bool outsideImage = true;
+		if ((ptImage.y >= 0) && (ptImage.y < m_height))
 		{
-			if ((ptScreen.x >= 0) && (ptScreen.x <= m_width))
+			if ((ptImage.x >= 0) && (ptImage.x < m_width))
 			{
-				int offset = ptScreen.y * m_width + ptScreen.x;
+				int offset = ptImage.y * m_width + ptImage.x;
 				color = m_image8Data[offset];
+				outsideImage = false;
 			}
 		}
-		text.Format("Color %d at %d,%d - highest pixel value in white square = %d", color, point.x, point.y, m_maxPixelValueInSquare);
+		text.Format("Color %d at %d,%d - highest pixel value in white square = %d", color, ptImage.x, ptImage.y, m_maxPixelValueInSquare);
 		SetStatusBarText(text);
 
 		if (MK_LBUTTON & nFlags)
 		{
 			CPoint ptClient = point + ptScroll;
-			CPoint ptImage = DisplayToImage(ptClient);
 			// Left Button Down
 			if (-1 == m_regPtMoving)
 			{
@@ -1466,7 +1651,7 @@ afx_msg void COperatorConsole3View::OnMouseMove(UINT nFlags, CPoint point)
 				int n = 0;
 				for (auto i = registrationCoordinates.begin(); i != registrationCoordinates.end(); i++, n++)
 				{
-					CRect rc(i->x - REFERENCE_POINT_RADIUS, i->y - REFERENCE_POINT_RADIUS, i->x + REFERENCE_POINT_RADIUS, i->y + REFERENCE_POINT_RADIUS);
+					CRect rc(i->x - m_registrationPointsRadius, i->y - m_registrationPointsRadius, i->x + m_registrationPointsRadius, i->y + m_registrationPointsRadius);
 					if (rc.PtInRect(ptImage))
 					{
 						m_regPtMoving = n;

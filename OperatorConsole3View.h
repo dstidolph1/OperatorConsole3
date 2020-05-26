@@ -27,6 +27,9 @@ typedef enum
 	eStateFocusingCamera,
 	eStateTesting1Camera,
 	eStateTesting2Camera,
+	eStateWaitForDiffusionFilter,
+	eStateTestingDiffusionFilter,
+	eStateWaitRemoveDiffusionFilter,
 	eStateReportResults
 } OperatorConsoleState;
 
@@ -63,6 +66,7 @@ protected:
 	void WriteAttrib(CFile& file, std::string name, int value, bool inQuotes = true, bool addComma = true);
 	bool GetFrame(std::vector<uint8_t>& image8Data, std::vector<uint16_t>& image16Data);
 	void DisplayFocusResult(CDC *pDC, CPoint pt, double value);
+	void DisplayText(CDC* pDC, CPoint pt, CString text);
 	CStringW UTF8toUTF16(const CStringA& utf8);
 	void DrawRegistrationPoint(CDC* pDC, CPoint pt);
 	void InitPictureData();
@@ -76,6 +80,9 @@ protected:
 	OperatorConsoleState HandleFocusingCamera(bool newState);
 	OperatorConsoleState HandleTesting1Camera(bool newState);
 	OperatorConsoleState HandleTesting2Camera(bool newState);
+	OperatorConsoleState HandleWaitForDiffusionFilter(bool newState);
+	OperatorConsoleState HandleTestWithDiffusionFilter(bool newState);
+	OperatorConsoleState HandleWaitForRemovalOfDiffusionFilter(bool newState);
 	OperatorConsoleState HandleReportResults(bool newState);
 	CMenu* GetParentMenu();
 	void SetStatusBarText(CString text);
@@ -110,6 +117,9 @@ protected:
 	bool m_SaveEveryFrame8;
 	bool m_SaveEveryFrame16;
 	int m_regPtMoving;
+	bool m_ShowInstallDiffusionFilter;
+	bool m_ShowRemoveDiffusionFilter;
+	bool m_ShowTestingDiffusionFilter;
 	CPoint m_ptLastMovePt;
 	int m_SaveFrameCount;
 	int m_MaxSaveFrames;
@@ -135,6 +145,8 @@ protected:
 	bool m_bFullChartMTF50Done;
 	bool m_bRunTestFullChartSNR;
 	bool m_bFullChartSNRDone;
+	bool m_bRunDiffusionTest;
+	bool m_bDiffusionTestDone;
 	int m_numImagesToAverage;
 	CEvent m_ShutdownEvent;
 	CEvent m_MatlabImageTestReadyEvent;

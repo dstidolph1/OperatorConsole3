@@ -68,6 +68,10 @@ CProperties::CProperties()
     m_proplist.push_back(t_props("Focus", "PT3", CPoint(1205, 1145), &m_QuickPoints[2]));
     m_proplist.push_back(t_props("Focus", "PT4", CPoint(1700, 950), &m_QuickPoints[3]));
     m_proplist.push_back(t_props("Focus", "PT5", CPoint(1180, 1450), &m_QuickPoints[4]));
+    m_proplist.push_back(t_props("Diffusion", "MaxPixelAverage", 128, &m_MaxDiffusionValue));
+    m_proplist.push_back(t_props("Diffusion", "MinPixelAverage", 20, &m_MinDiffusionValue));
+    m_proplist.push_back(t_props("Diffusion", "CountDiffusionDetected", 10, &m_CountDiffusionFilterValid));
+    m_proplist.push_back(t_props("Diffusion", "NumImagesToAverage", 12, &m_NumDiffusionImagesToAverage));
     if (!Load())
     {
         Create();

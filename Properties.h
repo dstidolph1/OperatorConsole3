@@ -32,6 +32,10 @@ public:
     int m_NumImagesAverage;
     std::vector<CPoint> m_QuickPoints;
     int m_FiducialRadius;
+    int m_MinDiffusionValue;
+    int m_MaxDiffusionValue;
+    int m_CountDiffusionFilterValid;
+    int m_NumDiffusionImagesToAverage;
 
 private:
     bool GetPoint(CString text, CPoint &pt);
