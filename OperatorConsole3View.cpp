@@ -958,6 +958,7 @@ OperatorConsoleState COperatorConsole3View::HandleTestWithDiffusionFilter(bool n
 				return SetProgramState(eStateWaitRemoveDiffusionFilter);
 			}
 		}
+		return SetProgramState(eStateTestingDiffusionFilter); // return back here for more averaging
 	}
 	else
 		return SetProgramState(eStateWaitForCameraLock); // back to beginning
