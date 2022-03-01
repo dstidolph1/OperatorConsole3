@@ -17,16 +17,27 @@ bool MatlabTestCode::Initialize()
 {
 	bool success = false;
 	try {
+		CreateDirectoryA("C:\\Temp", NULL);
 		auto mode = mc::MATLABApplicationMode::IN_PROCESS;
 		std::vector<std::u16string> opts = { u"-logfile",
 						u"C:\\temp\\matlab_app.log" };
 		m_matlabApplication = mc::initMATLABApplication(mode, opts);
+		if (m_matlabApplication)
+		{
+			const std::string STR_CTF_NAME = "C:\\Eyelock\\OperatorConsole3\\MatlabMTFLib_3.ctf"; // this could hold path information
+			const std::u16string U16STR_CTF_NAME = matlab::cpplib::convertUTF8StringToUTF16String(STR_CTF_NAME);
 
-		const std::string STR_CTF_NAME = "C:\\Eyelock\\OperatorConsole3\\MatlabMTFLib_3.ctf"; // this could hold path information
-		const std::u16string U16STR_CTF_NAME = matlab::cpplib::convertUTF8StringToUTF16String(STR_CTF_NAME);
-
-		m_matlabLibrary = mc::initMATLABLibrary(m_matlabApplication, U16STR_CTF_NAME);
-		success = true;
+			m_matlabLibrary = mc::initMATLABLibrary(m_matlabApplication, U16STR_CTF_NAME);
+			if (m_matlabLibrary)
+			{
+				LOGMSG_INFO("Success from initMATLABLibrary");
+				success = true;
+			}
+			else
+				LOGMSG_ERROR("Error from initMATLABLibrary");
+		}
+		else
+			LOGMSG_ERROR("Error from initMATLABApplication");
 	}
 	catch (matlab::cpplib::CppSharedLibException& e)
 	{
