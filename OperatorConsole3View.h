@@ -147,6 +147,7 @@ protected:
 	bool m_bFullChartSNRDone;
 	bool m_bRunDiffusionTest;
 	bool m_bDiffusionTestDone;
+	bool m_bOverrideMagLock;
 	int m_numImagesToAverage;
 	CEvent m_ShutdownEvent;
 	CEvent m_MatlabImageTestReadyEvent;
@@ -158,15 +159,17 @@ protected:
 	std::vector<uint32_t> m_image32Average;
 	OperatorConsoleState m_programState;
 	bool m_stateChange;
+#ifdef USE_MATLAB
 	MatlabTestCode m_matlabTestCode;
+	std::vector<QuickMTF50Data> m_outputQuickMTF50;
+	std::vector<FullChartSNRData> m_outputFullChartSNR;
+	std::vector<FullChartMTF50Data> m_outputFullChartMTF50;
+#endif
 	std::vector<CPoint> registrationCoordinates;
 	CameraInfoParser m_CameraInfo;
 	std::vector<CPoint> m_GreyBoxes;
 	std::vector<CPoint> m_FocusPoints;
 	// Output variables
-	std::vector<QuickMTF50Data> m_outputQuickMTF50;
-	std::vector<FullChartSNRData> m_outputFullChartSNR;
-	std::vector<FullChartMTF50Data> m_outputFullChartMTF50;
 
 // Generated message map functions
 protected:

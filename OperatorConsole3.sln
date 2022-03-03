@@ -7,20 +7,32 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OperatorConsole3", "Operato
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
-		Debug|x64 = Debug|x64
-		Debug|x86 = Debug|x86
-		Release|x64 = Release|x64
-		Release|x86 = Release|x86
+		Debug-Matlab|x64 = Debug-Matlab|x64
+		Debug-Matlab|x86 = Debug-Matlab|x86
+		Debug-Plain|x64 = Debug-Plain|x64
+		Debug-Plain|x86 = Debug-Plain|x86
+		Release-Matlab|x64 = Release-Matlab|x64
+		Release-Matlab|x86 = Release-Matlab|x86
+		Release-Plain|x64 = Release-Plain|x64
+		Release-Plain|x86 = Release-Plain|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{8DED9B99-AB5D-472E-A1F2-11F5A957AE0C}.Debug|x64.ActiveCfg = Debug|x64
-		{8DED9B99-AB5D-472E-A1F2-11F5A957AE0C}.Debug|x64.Build.0 = Debug|x64
-		{8DED9B99-AB5D-472E-A1F2-11F5A957AE0C}.Debug|x86.ActiveCfg = Debug|Win32
-		{8DED9B99-AB5D-472E-A1F2-11F5A957AE0C}.Debug|x86.Build.0 = Debug|Win32
-		{8DED9B99-AB5D-472E-A1F2-11F5A957AE0C}.Release|x64.ActiveCfg = Release|x64
-		{8DED9B99-AB5D-472E-A1F2-11F5A957AE0C}.Release|x64.Build.0 = Release|x64
-		{8DED9B99-AB5D-472E-A1F2-11F5A957AE0C}.Release|x86.ActiveCfg = Release|Win32
-		{8DED9B99-AB5D-472E-A1F2-11F5A957AE0C}.Release|x86.Build.0 = Release|Win32
+		{8DED9B99-AB5D-472E-A1F2-11F5A957AE0C}.Debug-Matlab|x64.ActiveCfg = Debug-Matlab|x64
+		{8DED9B99-AB5D-472E-A1F2-11F5A957AE0C}.Debug-Matlab|x64.Build.0 = Debug-Matlab|x64
+		{8DED9B99-AB5D-472E-A1F2-11F5A957AE0C}.Debug-Matlab|x86.ActiveCfg = Debug-Matlab|Win32
+		{8DED9B99-AB5D-472E-A1F2-11F5A957AE0C}.Debug-Matlab|x86.Build.0 = Debug-Matlab|Win32
+		{8DED9B99-AB5D-472E-A1F2-11F5A957AE0C}.Debug-Plain|x64.ActiveCfg = Debug-Plain|x64
+		{8DED9B99-AB5D-472E-A1F2-11F5A957AE0C}.Debug-Plain|x64.Build.0 = Debug-Plain|x64
+		{8DED9B99-AB5D-472E-A1F2-11F5A957AE0C}.Debug-Plain|x86.ActiveCfg = Debug-Plain|Win32
+		{8DED9B99-AB5D-472E-A1F2-11F5A957AE0C}.Debug-Plain|x86.Build.0 = Debug-Plain|Win32
+		{8DED9B99-AB5D-472E-A1F2-11F5A957AE0C}.Release-Matlab|x64.ActiveCfg = Release-Matlab|x64
+		{8DED9B99-AB5D-472E-A1F2-11F5A957AE0C}.Release-Matlab|x64.Build.0 = Release-Matlab|x64
+		{8DED9B99-AB5D-472E-A1F2-11F5A957AE0C}.Release-Matlab|x86.ActiveCfg = Release-Matlab|Win32
+		{8DED9B99-AB5D-472E-A1F2-11F5A957AE0C}.Release-Matlab|x86.Build.0 = Release-Matlab|Win32
+		{8DED9B99-AB5D-472E-A1F2-11F5A957AE0C}.Release-Plain|x64.ActiveCfg = Release-Plain|x64
+		{8DED9B99-AB5D-472E-A1F2-11F5A957AE0C}.Release-Plain|x64.Build.0 = Release-Plain|x64
+		{8DED9B99-AB5D-472E-A1F2-11F5A957AE0C}.Release-Plain|x86.ActiveCfg = Release-Plain|Win32
+		{8DED9B99-AB5D-472E-A1F2-11F5A957AE0C}.Release-Plain|x86.Build.0 = Release-Plain|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

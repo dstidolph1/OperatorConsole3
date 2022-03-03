@@ -83,7 +83,8 @@ COperatorConsole3View::COperatorConsole3View() noexcept :
 	m_DrawFullChartMTF50(false), m_DrawFullChartSNR(false), m_bFullChartMTF50Done(false), m_bFullChartSNRDone(false),
 	m_bQuickMTF50Done(false), m_stateChange(false), m_TestingThreadRunning(false),
 	m_pProgramStateThread(nullptr), m_pTestingThread(nullptr), m_numImagesToAverage(20), m_regPtMoving(-1),
-	m_ShowInstallDiffusionFilter(false), m_ShowRemoveDiffusionFilter(false), m_ShowTestingDiffusionFilter(false)
+	m_ShowInstallDiffusionFilter(false), m_ShowRemoveDiffusionFilter(false), m_ShowTestingDiffusionFilter(false),
+	m_bOverrideMagLock(false)
 {
 	// TODO: add construction code here
 	::CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
@@ -493,6 +494,10 @@ bool COperatorConsole3View::MagLockEngaged()
 		magLockEngaged = (0 == value);
 		hr = m_vidCapture.CameraControl()->Get(CameraControl_Focus, &value, &flags);
 		hr = m_vidCapture.CameraControl()->Set(CameraControl_Focus, VENDER_CMD_NONE, flags);
+	}
+	if (m_bOverrideMagLock)
+	{
+		magLockEngaged = m_bMagStripeEngaged;
 	}
 	if (magLockEngaged != lastState)
 	{
@@ -1496,6 +1501,7 @@ void COperatorConsole3View::OnCameraOperatorConsoleLock()
 {
 	m_OperatorConsoleLockEngaged = !m_OperatorConsoleLockEngaged;
 	m_bMagStripeEngaged = m_OperatorConsoleLockEngaged;
+	m_bOverrideMagLock = m_OperatorConsoleLockEngaged;
 	CMenu* pMenu = GetParentMenu();
 	if (pMenu)
 	{
