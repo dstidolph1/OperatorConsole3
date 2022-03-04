@@ -25,6 +25,7 @@
 #include <string>
 #include <sstream>
 #include <iomanip>
+#include "EyelockCamera.h"
 #include "CameraInfoParser.h"
 #include "QEdit.h"
 
@@ -189,7 +190,7 @@ public:
 
     HRESULT GetCameraFrame(long &sizeBuffer, long *buffer);
 
-	HRESULT GetCameraFrame(std::vector<uint8_t>& image8Data, std::vector<uint16_t> &image16Data, CRect &rcMaxValue, uint8_t &maxPixelValue);
+	HRESULT GetCameraFrame(std::vector<uint8_t>& image8Data, std::vector<uint16_t> &image16Data, CRect &rcMaxValue, uint8_t &maxPixelValue, CameraImageInfo& imageInfo);
 };
 
 #endif

@@ -13,6 +13,7 @@
 #include <wincodec.h>
 #include "Logging.h"
 #include "MatlabTestCode.h"
+#include "EyelockCamera.h"
 #include <memory>
 
 typedef std::shared_mutex Lock;
@@ -64,12 +65,12 @@ protected:
 	void WriteAttrib(CFile& file, std::string name, std::string value, bool addComma = true);
 	void WriteAttrib(CFile &file, std::string name, double value, bool inQuotes = true, bool addComma = true);
 	void WriteAttrib(CFile& file, std::string name, int value, bool inQuotes = true, bool addComma = true);
-	bool GetFrame(std::vector<uint8_t>& image8Data, std::vector<uint16_t>& image16Data);
+	bool GetFrame(std::vector<uint8_t>& image8Data, std::vector<uint16_t>& image16Data, CameraImageInfo& imageInfo);
 	void DisplayFocusResult(CDC *pDC, CPoint pt, double value);
 	void DisplayText(CDC* pDC, CPoint pt, CString text);
 	CStringW UTF8toUTF16(const CStringA& utf8);
 	void DrawRegistrationPoint(CDC* pDC, CPoint pt);
-	void InitPictureData();
+	void InitPictureData(int width, int height);
 	bool LoadImage8ToFile(const char* filename);
 	void SaveImage8ToFile(const char* filename, std::vector<uint8_t>& image8);
 	void SaveImage16ToFile(const wchar_t* filename, const std::vector<uint16_t> &image);
@@ -158,6 +159,7 @@ protected:
 	std::vector<uint16_t> m_image16Data, m_image16DataTesting;
 	std::vector<uint32_t> m_image32Average;
 	OperatorConsoleState m_programState;
+	CameraImageInfo m_imageInfo;
 	bool m_stateChange;
 #ifdef USE_MATLAB
 	MatlabTestCode m_matlabTestCode;

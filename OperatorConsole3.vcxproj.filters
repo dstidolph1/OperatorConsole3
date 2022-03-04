@@ -84,6 +84,12 @@
     <ClInclude Include="Properties.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="CameraIMX241.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="EyelockCamera.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="OperatorConsole3.cpp">
@@ -132,6 +138,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Properties.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CameraIMX241.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CameraLibrary.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="EyelockCamera.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

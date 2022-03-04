@@ -18,6 +18,7 @@
 #include <fstream>
 #include "MatlabTestCode.h"
 #include "MainFrm.h"
+#include "EyelockCamera.h"
 
 using namespace Gdiplus;
 
@@ -122,6 +123,11 @@ COperatorConsole3View::~COperatorConsole3View()
 	{
 		delete m_pBitmapInfo;
 		m_pBitmapInfo = nullptr;
+	}
+	if (m_pBitmapInfoSaved)
+	{
+		delete m_pBitmapInfoSaved;
+		m_pBitmapInfoSaved = nullptr;
 	}
 }
 
@@ -243,6 +249,7 @@ void COperatorConsole3View::OnDraw(CDC* pDC)
 	}
 	// Setting the StretchBltMode to COLORONCOLOR eliminates the horrible dithering for grayscale images.
 	SetStretchBltMode(pDC->GetSafeHdc(), COLORONCOLOR);
+	if (!m_image8Data.empty() && (m_pBitmapInfo != nullptr))
 	{
 		ReadLock lock(m_pictureLock);
 		::StretchDIBits(pDC->GetSafeHdc(), 0, 0, width, height, 0, 0, m_width, m_height, LPVOID(&m_image8Data[0]), m_pBitmapInfo, DIB_RGB_COLORS, SRCCOPY);
@@ -348,10 +355,10 @@ bool COperatorConsole3View::OpenJSON(CFile& file, CString filename)
 	return success;
 }
 
-void COperatorConsole3View::InitPictureData()
+void COperatorConsole3View::InitPictureData(int width, int height)
 {
-	m_width = PICTURE_WIDTH;
-	m_height = PICTURE_HEIGHT;
+	m_width = width;
+	m_height = height;
 	const auto numPixels = m_width * m_height;
 	if (m_pBitmapInfo)
 	{
@@ -398,7 +405,7 @@ void COperatorConsole3View::OnInitialUpdate()
 	sizeTotal.cx = m_vidCapture.GetWidth();
 	sizeTotal.cy = m_vidCapture.GetHeight();
 	SetScrollSizes(MM_TEXT, sizeTotal);
-	InitPictureData();
+	InitPictureData(sizeTotal.cx, sizeTotal.cy);
 	m_OperatorConsoleLockEngaged = false;
 	m_OperatorConsoleSwitchPressed = false;
 	m_CameraRunning = false;
@@ -617,7 +624,7 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 	{
 		if (m_CameraRunning)
 		{
-			if (GetFrame(m_image8Data, m_image16Data))
+			if (GetFrame(m_image8Data, m_image16Data, m_imageInfo))
 			{
 #if defined(DRAW_MAIN_THREAD)
 				Invalidate(FALSE);
@@ -632,7 +639,8 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 					//memcpy(&m_image8DataTesting[0], &m_image8Data[0], m_image8Data.size()); // Copy to backup which will be tested
 					LOGMSG_DEBUG("Copying m_image8Data to m_image8DataTesting for focus testing");
 					ReadLock lock(m_pictureLock);
-					memcpy(&m_image8DataTesting[0], &m_image8Data[0], m_image8Data.size()); // Copy to backup which will be tested
+					if (!m_image8DataTesting.empty())
+						memcpy(&m_image8DataTesting[0], &m_image8Data[0], m_image8Data.size()); // Copy to backup which will be tested
 					LOGMSG_DEBUG("Setting TestEvent for focus testing");
 					m_RunFocusTest = true;
 					m_DrawFocusTestResults = true;
@@ -693,13 +701,13 @@ void COperatorConsole3View::CheckIfSaveFrames(std::vector<uint8_t>& image8, std:
 	}
 }
 
-bool COperatorConsole3View::GetFrame(std::vector<uint8_t>& image8Data, std::vector<uint16_t>& image16Data)
+bool COperatorConsole3View::GetFrame(std::vector<uint8_t>& image8Data, std::vector<uint16_t>& image16Data, CameraImageInfo& imageInfo)
 {
 	bool success = false;
 	CRect rcWhiteSquare(1188, 582, 1317, 733);
 	{
 		WriteLock lock(m_pictureLock);
-		HRESULT hr = m_vidCapture.GetCameraFrame(image8Data, image16Data, rcWhiteSquare, m_maxPixelValueInSquare); // This will load the bitmap with the current frame
+		HRESULT hr = m_vidCapture.GetCameraFrame(image8Data, image16Data, rcWhiteSquare, m_maxPixelValueInSquare, imageInfo); // This will load the bitmap with the current frame
 		m_FrameNumber++;
 		success = SUCCEEDED(hr);
 	}
@@ -721,7 +729,7 @@ OperatorConsoleState COperatorConsole3View::HandleTesting1Camera(bool newState)
 	if (MagLockEngaged())
 	{
 		// Get Video Frame
-		bool frameValid = GetFrame(m_image8Data, m_image16Data);
+		bool frameValid = GetFrame(m_image8Data, m_image16Data, m_imageInfo);
 		if (frameValid)
 		{
 			if (newState)
@@ -816,7 +824,7 @@ OperatorConsoleState COperatorConsole3View::HandleTesting2Camera(bool newState)
 			size_t sizeMem = size * sizeElement;
 			memset(&m_image32Average[0], 0, sizeMem);
 		}
-		bool frameValid = GetFrame(m_image8Data, m_image16Data);
+		bool frameValid = GetFrame(m_image8Data, m_image16Data, m_imageInfo);
 		if (frameValid)
 		{
 #if defined(DRAW_MAIN_THREAD)
@@ -889,7 +897,7 @@ OperatorConsoleState COperatorConsole3View::HandleWaitForDiffusionFilter(bool ne
 			m_ShowTestingDiffusionFilter = false;
 			countDiffusionFilterDetected = 0;
 		}
-		bool frameValid = GetFrame(m_image8Data, m_image16Data);
+		bool frameValid = GetFrame(m_image8Data, m_image16Data, m_imageInfo);
 		if (frameValid)
 		{
 			CheckIfSaveFrames(m_image8Data, m_image16Data);
@@ -931,7 +939,7 @@ OperatorConsoleState COperatorConsole3View::HandleTestWithDiffusionFilter(bool n
 			memset(&m_image32Average[0], 0, sizeof(m_image32Average[0]) * m_image32Average.size());
 			makingAverage = true;
 		}
-		bool frameValid = GetFrame(m_image8Data, m_image16Data);
+		bool frameValid = GetFrame(m_image8Data, m_image16Data, m_imageInfo);
 		if (frameValid)
 		{
 			CheckIfSaveFrames(m_image8Data, m_image16Data);
@@ -984,7 +992,7 @@ OperatorConsoleState COperatorConsole3View::HandleWaitForRemovalOfDiffusionFilte
 			m_ShowTestingDiffusionFilter = false;
 			countDiffusionFilterNotDetected = 0;
 		}
-		bool frameValid = GetFrame(m_image8Data, m_image16Data);
+		bool frameValid = GetFrame(m_image8Data, m_image16Data, m_imageInfo);
 		if (frameValid)
 		{
 			CheckIfSaveFrames(m_image8Data, m_image16Data);
@@ -1023,7 +1031,7 @@ OperatorConsoleState COperatorConsole3View::HandleReportResults(bool newState)
 			m_bRunTestQuickMTF50 = false;
 			m_bFullChartSNRDone = false;
 		}
-		bool frameValid = GetFrame(m_image8Data, m_image16Data);
+		bool frameValid = GetFrame(m_image8Data, m_image16Data, m_imageInfo);
 		if (frameValid)
 		{
 #if defined(DRAW_MAIN_THREAD)
@@ -1120,7 +1128,8 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 					LOGMSG_DEBUG("Running RunTestQuickMTF50 - turning off m_bQuickMTF50Done");
 					pThis->m_bQuickMTF50Done = false;
 					AfxGetMainWnd()->SetWindowTextA("Running QuickMTF50");
-					pThis->m_DrawFocusTestResults = pThis->m_matlabTestCode.RunTestQuickMTF50(pThis->m_image8DataTesting, pThis->m_width, pThis->m_height, pThis->registrationCoordinates, pThis->m_outputQuickMTF50);
+					if (!pThis->m_image8DataTesting.empty())
+						pThis->m_DrawFocusTestResults = pThis->m_matlabTestCode.RunTestQuickMTF50(pThis->m_image8DataTesting, pThis->m_width, pThis->m_height, pThis->registrationCoordinates, pThis->m_outputQuickMTF50);
 					LOGMSG_DEBUG("After RunTestQuickMTF50 - " + std::to_string(pThis->m_DrawFocusTestResults));
 					if (pThis->m_DrawFocusTestResults && !pThis->m_ThreadShutdown)
 					{
@@ -1416,6 +1425,11 @@ void COperatorConsole3View::SaveImage16ToFile(const wchar_t *pathname, const std
 bool COperatorConsole3View::LoadImage8ToFile(const char* filename)
 {
 	bool success = false;
+	if (m_pBitmapInfoSaved)
+	{
+		delete m_pBitmapInfoSaved;
+		m_pBitmapInfoSaved = nullptr;
+	}
 	// The file... We open it with it's constructor
 	std::ifstream file(filename, std::ios::binary);
 	if (file)
@@ -1521,8 +1535,8 @@ void COperatorConsole3View::OnDestroy()
 	LOGMSG_DEBUG("Get threads to shut down");
 	m_ThreadShutdown = true;
 	m_ShutdownEvent.SetEvent();
-	WaitForSingleObject(m_pProgramStateThread->m_hThread, INFINITE);
-	WaitForSingleObject(m_pTestingThread->m_hThread, INFINITE);
+	WaitForSingleObject(m_pProgramStateThread->m_hThread, 1000);
+	WaitForSingleObject(m_pTestingThread->m_hThread, 1000);
 	LOGMSG_DEBUG("Threads shut down, continue shutting down...");
 	m_loggerFactory.Close();
 	CScrollView::OnDestroy();
