@@ -1,7 +1,5 @@
 #pragma once
 
-#ifdef USE_MATLAB
-
 #include <vector>
 #include <atltypes.h>
 //#include "mclmcrrt.h"
@@ -51,5 +49,3 @@ public:
 	bool RunTestFullChartSNR(std::vector<uint16_t>& image, int width, int height, const std::vector<CPoint>& registrationCoordinates, std::vector<FullChartSNRData> &output);
 	bool RunTestQuickMTF50(std::vector<uint8_t>& image, int width, int height, const std::vector<CPoint> &registrationCoordinates, std::vector<QuickMTF50Data> &output);
 };
-
-#endif

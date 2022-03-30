@@ -1,4 +1,5 @@
 /*
+/*
  * TestMain.cpp
  *
  *  Created on: 11 Dec, 2014
@@ -107,8 +108,11 @@ HRESULT VideoCapture::GetCameraFrame(long& sizeBuffer, long* buffer)
   {
     long num = 0;
     captureResult = sgGetSampleGrabber()->GetCurrentBuffer(&num, NULL);
-    if (SUCCEEDED(captureResult) && (num>0))
-      captureResult = sgGetSampleGrabber()->GetCurrentBuffer(&sizeBuffer, buffer);
+    if (SUCCEEDED(captureResult) && (num <= sizeBuffer))
+    {
+        memset(buffer, 0, num);
+        captureResult = sgGetSampleGrabber()->GetCurrentBuffer(&num, buffer);
+    }
     if (0 == sizeBuffer)
       captureResult = E_FAIL;
     switch (captureResult)
@@ -144,10 +148,10 @@ HRESULT VideoCapture::GetCameraFrame(std::vector<uint8_t>& image8Data, std::vect
 {
   HRESULT hr = E_FAIL;
   long length = gWidth * gHeight;
-  long size16Buffer = long(length) * long(sizeof(uint16_t));
-  if (0 == image10Data.size())
+  long size16Buffer = length * 5 / 4; // long(length)* long(sizeof(uint16_t));
+  if (size16Buffer != image10Data.size())
   {
-    image10Data.resize(length);
+    image10Data.resize(size16Buffer);
   }
   const char* p8Bit = reinterpret_cast<char*>(&image10Data[0]);
   hr = GetCameraFrame(size16Buffer, (long*)&image10Data[0]);
@@ -156,7 +160,12 @@ HRESULT VideoCapture::GetCameraFrame(std::vector<uint8_t>& image8Data, std::vect
   {
     if (image8Data.size() != length)
       image8Data.resize(length);
-
+    switch (m_BitShift)
+    {
+    case BitShiftType::shift0: CameraIMX241::Instance().SetBitShift(0); break;
+    case BitShiftType::shift1: CameraIMX241::Instance().SetBitShift(1); break;
+    case BitShiftType::shift2: CameraIMX241::Instance().SetBitShift(2); break;
+    }
     if (CameraIMX241::Instance().ConvertVideoTo8Bit(&image10Data[0], size16Buffer, &image8Data[0], length, imageInfo))
     {
       hr = S_OK;
@@ -874,7 +883,8 @@ HRESULT VideoCapture::StartVideoCapture()
             (pmtConfig->subtype == MEDIASUBTYPE_YUY2)) &&
           //-----------------------
           (pmtConfig->formattype == FORMAT_VideoInfo) &&
-          (pmtConfig->lSampleSize == desiredSize))
+          (pmtConfig->lSampleSize == desiredSize) &&
+            (scc.InputSize.cy == 1944)) // 2235
         {
           if (pmtConfig->subtype == MEDIASUBTYPE_EYELOCK_GREY_LOW_10_OF_16) {
             printf("GUID MEDIASUBTYPE_EYELOCK_GREY_LOW_10_OF_16\n");

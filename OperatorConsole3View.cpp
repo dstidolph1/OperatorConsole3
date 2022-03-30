@@ -1404,7 +1404,7 @@ void COperatorConsole3View::SaveImage16ToFile(const wchar_t *pathname, const std
 							}
 							if (SUCCEEDED(hr))
 							{
-								UINT stride = m_width * 2;
+								UINT stride = (m_width * 16 + 7) / 8;
 								UINT bufferSize = m_height * stride;
 								hr = sp_frame->WritePixels(m_height, stride, bufferSize, LPBYTE(&image[0]));
 							}

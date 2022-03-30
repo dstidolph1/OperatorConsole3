@@ -29,8 +29,8 @@
 #include "CameraInfoParser.h"
 #include "QEdit.h"
 
-#define PICTURE_WIDTH 2592
-#define PICTURE_HEIGHT 1944
+#define PICTURE_WIDTH 2592 // 2984 //2592
+#define PICTURE_HEIGHT 1944 // 2235 //1944
 
 typedef enum
 {

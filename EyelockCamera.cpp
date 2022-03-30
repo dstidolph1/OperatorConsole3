@@ -6,7 +6,7 @@
 
 EyelockCamera::EyelockCamera()
 {
-	bit_shift_ = 0;
+	bit_shift_ = 2;
 }
 
 bool EyelockCamera::LoadPGM(const std::string& filename, unsigned char* pDest, int sizeOfDest, CameraImageInfo& imageInfo)

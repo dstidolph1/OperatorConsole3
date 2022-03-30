@@ -87,7 +87,7 @@ public:
 	int GetImageSize() {return GetNormalWidth() * GetNormalHeight();}
 
 protected:
-	int bit_shift_ = 0;
+	int bit_shift_ = 2;
 	std::mutex mutex_lock;
 };
 
