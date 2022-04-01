@@ -277,201 +277,212 @@ bool CameraIMX241::ProcessCameraInfo(const unsigned char* pSrc, long sourceImage
 /// @param destLength Length of destination data
 /// @param imageInfo Write image data to this structure
 /// @return true if successful (known image data)
-bool CameraIMX241::ConvertVideoTo8Bit(const uint16_t* pSrc, long sourceLength, uint8_t* pDest, long destLength, CameraImageInfo& imageInfo)
+bool CameraIMX241::ConvertVideoTo8Bit(std::vector<uint8_t>& src, std::vector<uint8_t>& dest, CameraImageInfo& imageInfo)
 {
-	bool success = ProcessCameraInfo(reinterpret_cast<const unsigned char*>(pSrc), sourceLength, imageInfo);
-	if (success) // && !imageInfo.isTransitionFrame)
+	bool success = false;
+	if (!src.empty())
 	{
-		long outputSize = imageInfo.width_ * imageInfo.height_;
-		int xQuad = 0, yQuad = 0;
-		char buffer[256];
-		sprintf_s(buffer, sizeof(buffer),  "ConvertVideoTo8Bit Frame #%d, isTransitionFrame=%d, shift=%d", imageInfo.frameNumber, (int)imageInfo.isTransitionFrame, imageInfo.bit_shift_);
-		if (YUV422_8_2 == imageInfo.VideoFormat)
+		uint8_t* pSrc = reinterpret_cast<uint8_t*>(&src[0]);
+		success = ProcessCameraInfo(pSrc, long(src.size()), imageInfo);
+		if (success) // && !imageInfo.isTransitionFrame)
 		{
-			int pixelBlockCount = sourceLength / 5; // each pixel block is 4 pixels (upper 8 bits) followed by 1 byte holding bottom 2 bits of each pixel in the group 
-			const uint8_t* p8BitSrc = reinterpret_cast<const unsigned char*>(pSrc);
-			uint8_t* pConvertedPixel = pDest;
-			switch (imageInfo.bit_shift_) {
-			case 0: // bottom 8 bits
-				success = true;
-				for (auto nPixel = 0; nPixel < pixelBlockCount; nPixel++) {
-					const PackedPixelData* pPixelBlock = reinterpret_cast<const PackedPixelData*>(&p8BitSrc[nPixel * 5]);
-					uint16_t pixel1Value = (pPixelBlock->pixel1Upper8 << 2) | (pPixelBlock->pixelsLower2 >> 6);
-					uint16_t pixel2Value = (pPixelBlock->pixel2Upper8 << 2) | ((pPixelBlock->pixelsLower2 >> 4) & 0x03);
-					uint16_t pixel3Value = (pPixelBlock->pixel3Upper8 << 2) | ((pPixelBlock->pixelsLower2 >> 2) & 0x03);
-					uint16_t pixel4Value = (pPixelBlock->pixel4Upper8 << 2) | (pPixelBlock->pixelsLower2 & 0x03);
-					uint8_t shifted = 0xff & pixel1Value;
-					if (0 != (pixel1Value & 0x300))
-					{
-						shifted = 0xff; // make it white because bits above are on
-						imageInfo.num_forced_white_++;
-					}
-					*pConvertedPixel++ = shifted;
-					imageInfo.histogram_[shifted]++;
-					IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
-					shifted = 0xff & pixel2Value;
-					if (0 != (pixel2Value & 0x300))
-					{
-						shifted = 0xff; // make it white because bits above are on
-						imageInfo.num_forced_white_++;
-					}
-					*pConvertedPixel++ = shifted;
-					imageInfo.histogram_[shifted]++;
-					IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
-					shifted = 0xff & pixel3Value;
-					if (0 != (pixel3Value & 0x300))
-					{
-						shifted = 0xff; // make it white because bits above are on
-						imageInfo.num_forced_white_++;
-					}
-					*pConvertedPixel++ = shifted;
-					imageInfo.histogram_[shifted]++;
-					IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
-					shifted = 0xff & pixel4Value;
-					if (0 != (pixel4Value & 0x300))
-					{
-						shifted = 0xff; // make it white because bits above are on
-						imageInfo.num_forced_white_++;
-					}
-					*pConvertedPixel++ = shifted;
-					imageInfo.histogram_[shifted]++;
-					IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
-				}
-				break;
-			case 1: // middle 8 bits
-				success = true;
-				for (auto nPixel = 0; nPixel < pixelBlockCount; nPixel++) {
-					const PackedPixelData* pPixelBlock = reinterpret_cast<const PackedPixelData*>(&p8BitSrc[nPixel * 5]);
-					uint16_t pixel1Value = (pPixelBlock->pixel1Upper8 << 1) | (pPixelBlock->pixelsLower2 >> 7);
-					uint16_t pixel2Value = (pPixelBlock->pixel2Upper8 << 1) | ((pPixelBlock->pixelsLower2 >> 5) & 0x01);
-					uint16_t pixel3Value = (pPixelBlock->pixel3Upper8 << 1) | ((pPixelBlock->pixelsLower2 >> 3) & 0x01);
-					uint16_t pixel4Value = (pPixelBlock->pixel4Upper8 << 1) | ((pPixelBlock->pixelsLower2 >> 1) & 0x01);
-					uint8_t shifted = 0xff & pixel1Value;
-					if (0 != (pixel1Value & 0x100))
-					{
-						shifted = 0xff; // make it white because bits above are on
-						imageInfo.num_forced_white_++;
-					}
-					*pConvertedPixel++ = shifted;
-					imageInfo.histogram_[shifted]++;
-					IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
-					shifted = 0xff & pixel2Value;
-					if (0 != (pixel2Value & 0x100))
-					{
-						shifted = 0xff; // make it white because bits above are on
-						imageInfo.num_forced_white_++;
-					}
-					*pConvertedPixel++ = shifted;
-					imageInfo.histogram_[shifted]++;
-					IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
-					shifted = 0xff & pixel3Value;
-					if (0 != (pixel3Value & 0x100))
-					{
-						shifted = 0xff; // make it white because bits above are on
-						imageInfo.num_forced_white_++;
-					}
-					*pConvertedPixel++ = shifted;
-					imageInfo.histogram_[shifted]++;
-					IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
-					shifted = 0xff & pixel4Value;
-					if (0 != (pixel4Value & 0x100))
-					{
-						shifted = 0xff; // make it white because bits above are on
-						imageInfo.num_forced_white_++;
-					}
-					*pConvertedPixel++ = shifted;
-					imageInfo.histogram_[shifted]++;
-					IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
-				}
-				break;
-			case 2: // top 8 bits
-				success = true;
-				for (auto nPixel = 0; nPixel < pixelBlockCount; nPixel++) {
-					const PackedPixelData* pPixelBlock = reinterpret_cast<const PackedPixelData*>(&p8BitSrc[nPixel * 5]);
-					*pConvertedPixel++ = pPixelBlock->pixel1Upper8;
-					imageInfo.histogram_[pPixelBlock->pixel1Upper8]++;
-					IncQuad(pPixelBlock->pixel1Upper8, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
-					*pConvertedPixel++ = pPixelBlock->pixel2Upper8;
-					imageInfo.histogram_[pPixelBlock->pixel2Upper8]++;
-					IncQuad(pPixelBlock->pixel2Upper8, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
-					*pConvertedPixel++ = pPixelBlock->pixel1Upper8;
-					imageInfo.histogram_[pPixelBlock->pixel3Upper8]++;
-					IncQuad(pPixelBlock->pixel3Upper8, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
-					*pConvertedPixel++ = pPixelBlock->pixel1Upper8;
-					imageInfo.histogram_[pPixelBlock->pixel4Upper8]++;
-					IncQuad(pPixelBlock->pixel4Upper8, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
-				}
-				break;
-			default:
-				success = false;
-				break;
-			}
-		}
-		else if (RAW10 == imageInfo.VideoFormat)
-		{
-			int pixelCount = outputSize / 2; // the buffer holds 2 bytes per pixel, so we divide by 2 for the pixel count
-			switch (imageInfo.bit_shift_) {
-			case 0:
-				success = true;
-				for (auto i = 0; i < pixelCount; i++) {
-					uint8_t shifted = 0xff & pSrc[i];
-					if ((pSrc[i] & 0x300) != 0)
-					{
-						imageInfo.num_forced_white_++;
-						shifted = 0xff;
-					}
-					pDest[i] = shifted;
-					imageInfo.histogram_[shifted]++;
-					IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
-				}
-				break;
-			case 1:
-				success = true;
-				for (auto i = 0; i < pixelCount; i++) {
-					uint8_t shifted = 0xff & (pSrc[i] >> 1);
-					if ((pSrc[i] & 0x200) != 0)
-					{
-						imageInfo.num_forced_white_++;
-						shifted = 0xff;
-					}
-					pDest[i] = shifted;
-					imageInfo.histogram_[shifted]++;
-					IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
-				}
-				break;
-			case 2:
-				success = true;
-				for (auto i = 0; i < pixelCount; i++)
-				{
-					uint8_t shifted = 0xff & (pSrc[i] >> 2);
-					pDest[i] = shifted;
-					imageInfo.histogram_[shifted]++;
-					IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
-				}
-				break;
-			default:
-				success = false;
-				break;
-			}
-		}
-#if defined(OVERWRITE_IF_NO_METAINFO)
-		if (overwriteTopLinesNoMeta)
-		{
-			uint8_t color = 0xff;
-			if (YUV422_8_2 == imageInfo.VideoFormat)
-				color = 0xc0;
-			for (auto i = 0; i < 5; i++)
+			long outputSize = imageInfo.width_ * imageInfo.height_;
+			if (dest.size() != outputSize)
 			{
-				memset(&pDest[i* imageInfo.width], color, imageInfo.width);
+				dest.resize(outputSize);
 			}
-		}
+			int xQuad = 0, yQuad = 0;
+			char buffer[256];
+			sprintf_s(buffer, sizeof(buffer), "ConvertVideoTo8Bit Frame #%d, isTransitionFrame=%d, shift=%d", imageInfo.frameNumber, (int)imageInfo.isTransitionFrame, imageInfo.bit_shift_);
+			if (YUV422_8_2 == imageInfo.VideoFormat)
+			{
+				int numPixels = imageInfo.width_ * imageInfo.height_;
+				int pixelBlockCount = numPixels / 5; // each pixel block is 4 pixels (upper 8 bits) followed by 1 byte holding bottom 2 bits of each pixel in the group 
+				const uint8_t* p8BitSrc = pSrc;
+				uint8_t* pConvertedPixel = &dest[0];
+				switch (imageInfo.bit_shift_) {
+				case 0: // bottom 8 bits
+					success = true;
+					for (auto nPixel = 0; nPixel < pixelBlockCount; nPixel++) {
+						const PackedPixelData* pPixelBlock = reinterpret_cast<const PackedPixelData*>(&p8BitSrc[nPixel * 5]);
+						uint16_t pixel1Value = (pPixelBlock->pixel1Upper8 << 2) | (pPixelBlock->pixelsLower2 >> 6);
+						uint16_t pixel2Value = (pPixelBlock->pixel2Upper8 << 2) | ((pPixelBlock->pixelsLower2 >> 4) & 0x03);
+						uint16_t pixel3Value = (pPixelBlock->pixel3Upper8 << 2) | ((pPixelBlock->pixelsLower2 >> 2) & 0x03);
+						uint16_t pixel4Value = (pPixelBlock->pixel4Upper8 << 2) | (pPixelBlock->pixelsLower2 & 0x03);
+						uint8_t shifted = 0xff & pixel1Value;
+						if (0 != (pixel1Value & 0x300))
+						{
+							shifted = 0xff; // make it white because bits above are on
+							imageInfo.num_forced_white_++;
+						}
+						*pConvertedPixel++ = shifted;
+						imageInfo.histogram_[shifted]++;
+						IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
+						shifted = 0xff & pixel2Value;
+						if (0 != (pixel2Value & 0x300))
+						{
+							shifted = 0xff; // make it white because bits above are on
+							imageInfo.num_forced_white_++;
+						}
+						*pConvertedPixel++ = shifted;
+						imageInfo.histogram_[shifted]++;
+						IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
+						shifted = 0xff & pixel3Value;
+						if (0 != (pixel3Value & 0x300))
+						{
+							shifted = 0xff; // make it white because bits above are on
+							imageInfo.num_forced_white_++;
+						}
+						*pConvertedPixel++ = shifted;
+						imageInfo.histogram_[shifted]++;
+						IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
+						shifted = 0xff & pixel4Value;
+						if (0 != (pixel4Value & 0x300))
+						{
+							shifted = 0xff; // make it white because bits above are on
+							imageInfo.num_forced_white_++;
+						}
+						*pConvertedPixel++ = shifted;
+						imageInfo.histogram_[shifted]++;
+						IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
+					}
+					break;
+				case 1: // middle 8 bits
+					success = true;
+					for (auto nPixel = 0; nPixel < pixelBlockCount; nPixel++) {
+						const PackedPixelData* pPixelBlock = reinterpret_cast<const PackedPixelData*>(&p8BitSrc[nPixel * 5]);
+						uint16_t pixel1Value = (pPixelBlock->pixel1Upper8 << 1) | (pPixelBlock->pixelsLower2 >> 7);
+						uint16_t pixel2Value = (pPixelBlock->pixel2Upper8 << 1) | ((pPixelBlock->pixelsLower2 >> 5) & 0x01);
+						uint16_t pixel3Value = (pPixelBlock->pixel3Upper8 << 1) | ((pPixelBlock->pixelsLower2 >> 3) & 0x01);
+						uint16_t pixel4Value = (pPixelBlock->pixel4Upper8 << 1) | ((pPixelBlock->pixelsLower2 >> 1) & 0x01);
+						uint8_t shifted = 0xff & pixel1Value;
+						if (0 != (pixel1Value & 0x100))
+						{
+							shifted = 0xff; // make it white because bits above are on
+							imageInfo.num_forced_white_++;
+						}
+						*pConvertedPixel++ = shifted;
+						imageInfo.histogram_[shifted]++;
+						IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
+						shifted = 0xff & pixel2Value;
+						if (0 != (pixel2Value & 0x100))
+						{
+							shifted = 0xff; // make it white because bits above are on
+							imageInfo.num_forced_white_++;
+						}
+						*pConvertedPixel++ = shifted;
+						imageInfo.histogram_[shifted]++;
+						IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
+						shifted = 0xff & pixel3Value;
+						if (0 != (pixel3Value & 0x100))
+						{
+							shifted = 0xff; // make it white because bits above are on
+							imageInfo.num_forced_white_++;
+						}
+						*pConvertedPixel++ = shifted;
+						imageInfo.histogram_[shifted]++;
+						IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
+						shifted = 0xff & pixel4Value;
+						if (0 != (pixel4Value & 0x100))
+						{
+							shifted = 0xff; // make it white because bits above are on
+							imageInfo.num_forced_white_++;
+						}
+						*pConvertedPixel++ = shifted;
+						imageInfo.histogram_[shifted]++;
+						IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
+					}
+					break;
+				case 2: // top 8 bits
+					success = true;
+					for (auto nPixel = 0; nPixel < pixelBlockCount; nPixel++) {
+						int offset = nPixel * 5;
+						const PackedPixelData* pPixelBlock = reinterpret_cast<const PackedPixelData*>(&p8BitSrc[offset]);
+						*pConvertedPixel++ = pPixelBlock->pixel1Upper8;
+						imageInfo.histogram_[pPixelBlock->pixel1Upper8]++;
+						IncQuad(pPixelBlock->pixel1Upper8, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
+						*pConvertedPixel++ = pPixelBlock->pixel2Upper8;
+						imageInfo.histogram_[pPixelBlock->pixel2Upper8]++;
+						IncQuad(pPixelBlock->pixel2Upper8, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
+						*pConvertedPixel++ = pPixelBlock->pixel1Upper8;
+						imageInfo.histogram_[pPixelBlock->pixel3Upper8]++;
+						IncQuad(pPixelBlock->pixel3Upper8, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
+						*pConvertedPixel++ = pPixelBlock->pixel1Upper8;
+						imageInfo.histogram_[pPixelBlock->pixel4Upper8]++;
+						IncQuad(pPixelBlock->pixel4Upper8, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
+					}
+					break;
+				default:
+					success = false;
+					break;
+				}
+			}
+			else if (RAW10 == imageInfo.VideoFormat)
+			{
+				int pixelCount = outputSize / 2; // the buffer holds 2 bytes per pixel, so we divide by 2 for the pixel count
+				switch (imageInfo.bit_shift_) {
+				case 0:
+					success = true;
+					for (auto i = 0; i < pixelCount; i++) {
+						uint8_t shifted = 0xff & src[i];
+						if ((src[i] & 0x300) != 0)
+						{
+							imageInfo.num_forced_white_++;
+							shifted = 0xff;
+						}
+						dest[i] = shifted;
+						imageInfo.histogram_[shifted]++;
+						IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
+					}
+					break;
+				case 1:
+					success = true;
+					for (auto i = 0; i < pixelCount; i++) {
+						uint8_t shifted = 0xff & (src[i] >> 1);
+						if ((src[i] & 0x200) != 0)
+						{
+							imageInfo.num_forced_white_++;
+							shifted = 0xff;
+						}
+						dest[i] = shifted;
+						imageInfo.histogram_[shifted]++;
+						IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
+					}
+					break;
+				case 2:
+					success = true;
+					for (auto i = 0; i < pixelCount; i++)
+					{
+						uint8_t shifted = 0xff & (src[i] >> 2);
+						dest[i] = shifted;
+						imageInfo.histogram_[shifted]++;
+						IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
+					}
+					break;
+				default:
+					success = false;
+					break;
+				}
+			}
+#if defined(OVERWRITE_IF_NO_METAINFO)
+			if (overwriteTopLinesNoMeta)
+			{
+				uint8_t color = 0xff;
+				if (YUV422_8_2 == imageInfo.VideoFormat)
+					color = 0xc0;
+				for (auto i = 0; i < 5; i++)
+				{
+					memset(&pDest[i * imageInfo.width], color, imageInfo.width);
+				}
+			}
 #endif
-		if (success)
-			memcpy(pDest, &imageInfo, sizeof(imageInfo)); // Write the image info over the first bytes of the image
-	}
-	else
-	{
-		success = false;
+			if (success)
+				memcpy(&dest[0], &imageInfo, sizeof(imageInfo)); // Write the image info over the first bytes of the image
+		}
+		else
+		{
+			success = false;
+		}
 	}
 	return success;
 }

@@ -77,7 +77,7 @@ COperatorConsole3View::COperatorConsole3View() noexcept :
 	m_ThreadShutdown(false), m_SaveEveryFrame8(false),
 	m_SaveEveryFrame16(false), m_DrawRegistrationMarks(true), m_zoomDivision(1),
 	m_zoomMultiplier(1), m_shrinkDisplay(false), m_magnifyDisplay(false),
-	m_width(PICTURE_WIDTH), m_height(PICTURE_HEIGHT), m_maxPixelValueInSquare(0), m_FrameNumber(0),
+	m_maxPixelValueInSquare(0), m_FrameNumber(0),
 	m_MaxSaveFrames(10), m_RunFocusTest(false), m_pBitmapInfoSaved(nullptr), m_ShutdownEvent(FALSE, TRUE, NULL, NULL),
 	m_MatlabImageTestReadyEvent(FALSE, FALSE, NULL, NULL), m_DrawFocusTestResults(false), m_bMagStripeEngaged(false),
 	m_bCX3ButonPressed(false), m_bRunTestQuickMTF50(false), m_bRunTestFullChartMTF50(false), m_bRunTestFullChartSNR(false),
@@ -235,24 +235,24 @@ void COperatorConsole3View::OnDraw(CDC* pDC)
 {
 	CScrollView::OnPrepareDC(pDC, NULL);
 
-	int width = m_width;
-	int height = m_height;
+	int width = m_imageInfo.width_;
+	int height = m_imageInfo.height_;
 	if (m_shrinkDisplay)
 	{
-		width = m_width / m_zoomDivision;
-		height = m_height / m_zoomDivision;
+		width = m_imageInfo.width_ / m_zoomDivision;
+		height = m_imageInfo.height_ / m_zoomDivision;
 	}
 	else if (m_magnifyDisplay)
 	{
-		width = m_width * m_zoomMultiplier;
-		height = m_height * m_zoomMultiplier;
+		width = m_imageInfo.width_ * m_zoomMultiplier;
+		height = m_imageInfo.height_ * m_zoomMultiplier;
 	}
 	// Setting the StretchBltMode to COLORONCOLOR eliminates the horrible dithering for grayscale images.
 	SetStretchBltMode(pDC->GetSafeHdc(), COLORONCOLOR);
 	if (!m_image8Data.empty() && (m_pBitmapInfo != nullptr))
 	{
 		ReadLock lock(m_pictureLock);
-		::StretchDIBits(pDC->GetSafeHdc(), 0, 0, width, height, 0, 0, m_width, m_height, LPVOID(&m_image8Data[0]), m_pBitmapInfo, DIB_RGB_COLORS, SRCCOPY);
+		::StretchDIBits(pDC->GetSafeHdc(), 0, 0, width, height, 0, 0, m_imageInfo.width_, m_imageInfo.height_, LPVOID(&m_image8Data[0]), m_pBitmapInfo, DIB_RGB_COLORS, SRCCOPY);
 	}
 	if (m_DrawRegistrationMarks)
 	{
@@ -332,7 +332,7 @@ void COperatorConsole3View::OnDraw(CDC* pDC)
 		GetClientRect(&rc);
 		CBrush brBkGnd;
 		brBkGnd.CreateSolidBrush(RGB(252, 255, 255));
-		CPoint pt(m_width / 2 - 200, m_height / 2);
+		CPoint pt(m_imageInfo.width_ / 2 - 200, m_imageInfo.height_ / 2);
 		CPoint ptScreen = ImageToDisplay(pt);
 		pDC->TextOut(ptScreen.x, ptScreen.y, "Testing for this imager is done - please open and replace with next");
 	}
@@ -357,9 +357,9 @@ bool COperatorConsole3View::OpenJSON(CFile& file, CString filename)
 
 void COperatorConsole3View::InitPictureData(int width, int height)
 {
-	m_width = width;
-	m_height = height;
-	const auto numPixels = m_width * m_height;
+	m_imageInfo.width_ = width;
+	m_imageInfo.height_ = height;
+	const auto numPixels = m_imageInfo.width_ * m_imageInfo.height_;
 	if (m_pBitmapInfo)
 	{
 		delete m_pBitmapInfo;
@@ -369,8 +369,8 @@ void COperatorConsole3View::InitPictureData(int width, int height)
 	m_pBitmapInfo = (BITMAPINFO*)new uint8_t[m_sizeBitmapInfo];
 	memset(m_pBitmapInfo, 0, m_sizeBitmapInfo);
 	m_pBitmapInfo->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-	m_pBitmapInfo->bmiHeader.biWidth = m_width;
-	m_pBitmapInfo->bmiHeader.biHeight = -m_height;
+	m_pBitmapInfo->bmiHeader.biWidth = m_imageInfo.width_;
+	m_pBitmapInfo->bmiHeader.biHeight = -m_imageInfo.height_;
 	m_pBitmapInfo->bmiHeader.biBitCount = 8;
 	m_pBitmapInfo->bmiHeader.biPlanes = 1;
 	m_pBitmapInfo->bmiHeader.biCompression = BI_RGB;
@@ -400,8 +400,8 @@ void COperatorConsole3View::OnInitialUpdate()
 	LOGMSG_DEBUG("Startup");
 	CSize sizeTotal;
 	// TODO: calculate the total size of this view
-	m_width = m_vidCapture.GetWidth();
-	m_height = m_vidCapture.GetHeight();
+	m_imageInfo.width_ = m_vidCapture.GetWidth();
+	m_imageInfo.height_ = m_vidCapture.GetHeight();
 	sizeTotal.cx = m_vidCapture.GetWidth();
 	sizeTotal.cy = m_vidCapture.GetHeight();
 	SetScrollSizes(MM_TEXT, sizeTotal);
@@ -610,6 +610,7 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 		{
 			m_vidCapture.ReadCameraInfo(m_CameraInfo);
 			m_CameraID = m_CameraInfo.ToString();
+			InitPictureData(m_vidCapture.GetWidth(), m_vidCapture.GetHeight());
 			PostMessage(MSG_SET_CAMERA_INFO, 0, reinterpret_cast<LPARAM>(&m_CameraInfo));
 		}
 		else
@@ -624,8 +625,14 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 	{
 		if (m_CameraRunning)
 		{
-			if (GetFrame(m_image8Data, m_image16Data, m_imageInfo))
+			CameraImageInfo imageInfo;
+			if (GetFrame(m_image8Data, m_image16Data, imageInfo))
 			{
+				if ((imageInfo.width_ != m_imageInfo.width_) || (imageInfo.height_ != m_imageInfo.height_))
+				{
+					InitPictureData(imageInfo.width_, imageInfo.height_);
+					m_imageInfo = imageInfo;
+				}
 #if defined(DRAW_MAIN_THREAD)
 				Invalidate(FALSE);
 #else
@@ -639,6 +646,8 @@ OperatorConsoleState COperatorConsole3View::HandleFocusingCamera(bool newState)
 					//memcpy(&m_image8DataTesting[0], &m_image8Data[0], m_image8Data.size()); // Copy to backup which will be tested
 					LOGMSG_DEBUG("Copying m_image8Data to m_image8DataTesting for focus testing");
 					ReadLock lock(m_pictureLock);
+					if (!m_image8DataTesting.empty() && (m_image8DataTesting.size() != m_image8Data.size()))
+						m_image8DataTesting.resize(m_image8Data.size());
 					if (!m_image8DataTesting.empty())
 						memcpy(&m_image8DataTesting[0], &m_image8Data[0], m_image8Data.size()); // Copy to backup which will be tested
 					LOGMSG_DEBUG("Setting TestEvent for focus testing");
@@ -707,7 +716,7 @@ bool COperatorConsole3View::GetFrame(std::vector<uint8_t>& image8Data, std::vect
 	CRect rcWhiteSquare(1188, 582, 1317, 733);
 	{
 		WriteLock lock(m_pictureLock);
-		HRESULT hr = m_vidCapture.GetCameraFrame(image8Data, image16Data, rcWhiteSquare, m_maxPixelValueInSquare, imageInfo); // This will load the bitmap with the current frame
+		HRESULT hr = m_vidCapture.GetCameraFrame(image8Data, image16Data, imageInfo); // This will load the bitmap with the current frame
 		m_FrameNumber++;
 		success = SUCCEEDED(hr);
 	}
@@ -1129,7 +1138,7 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 					pThis->m_bQuickMTF50Done = false;
 					AfxGetMainWnd()->SetWindowTextA("Running QuickMTF50");
 					if (!pThis->m_image8DataTesting.empty())
-						pThis->m_DrawFocusTestResults = pThis->m_matlabTestCode.RunTestQuickMTF50(pThis->m_image8DataTesting, pThis->m_width, pThis->m_height, pThis->registrationCoordinates, pThis->m_outputQuickMTF50);
+						pThis->m_DrawFocusTestResults = pThis->m_matlabTestCode.RunTestQuickMTF50(pThis->m_image8DataTesting, pThis->m_imageInfo.width_, pThis->m_imageInfo.height_, pThis->registrationCoordinates, pThis->m_outputQuickMTF50);
 					LOGMSG_DEBUG("After RunTestQuickMTF50 - " + std::to_string(pThis->m_DrawFocusTestResults));
 					if (pThis->m_DrawFocusTestResults && !pThis->m_ThreadShutdown)
 					{
@@ -1168,7 +1177,7 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 					pThis->m_bFullChartMTF50Done = false;
 					LOGMSG_DEBUG("Running RunTestFullChartMTF50 - with average");
 					AfxGetMainWnd()->SetWindowTextA("Running FullChartMTF50");
-					pThis->m_DrawFullChartMTF50 = pThis->m_matlabTestCode.RunTestFullChartMTF50(pThis->m_image16DataTesting, pThis->m_width, pThis->m_height, pThis->registrationCoordinates, pThis->m_outputFullChartMTF50);
+					pThis->m_DrawFullChartMTF50 = pThis->m_matlabTestCode.RunTestFullChartMTF50(pThis->m_image16DataTesting, pThis->m_imageInfo.width_, pThis->m_imageInfo.height_, pThis->registrationCoordinates, pThis->m_outputFullChartMTF50);
 					LOGMSG_DEBUG("After RunTestFullChartMTF50 - " + std::to_string(pThis->m_DrawFullChartMTF50));
 					if (pThis->m_DrawFullChartMTF50 && !pThis->m_ThreadShutdown)
 					{
@@ -1212,7 +1221,7 @@ UINT __cdecl COperatorConsole3View::AnalyzeFrameThreadProc(LPVOID pParam)
 					pThis->m_bFullChartSNRDone = false;
 					LOGMSG_DEBUG("Running RunTestFullChartSNR");
 					AfxGetMainWnd()->SetWindowTextA("Running FullChartSNR");
-					pThis->m_DrawFullChartSNR = pThis->m_matlabTestCode.RunTestFullChartSNR(pThis->m_image16DataTesting, pThis->m_width, pThis->m_height, pThis->registrationCoordinates, pThis->m_outputFullChartSNR);
+					pThis->m_DrawFullChartSNR = pThis->m_matlabTestCode.RunTestFullChartSNR(pThis->m_image16DataTesting, pThis->m_imageInfo.width_, pThis->m_imageInfo.height_, pThis->registrationCoordinates, pThis->m_outputFullChartSNR);
 					LOGMSG_DEBUG("After RunTestFullChartSNR - " + std::to_string(pThis->m_DrawFullChartSNR));
 					if (pThis->m_DrawFullChartSNR && !pThis->m_ThreadShutdown)
 					{
@@ -1388,7 +1397,7 @@ void COperatorConsole3View::SaveImage16ToFile(const wchar_t *pathname, const std
 							}
 							if (SUCCEEDED(hr))
 							{
-								hr = sp_frame->SetSize(m_width, m_height);
+								hr = sp_frame->SetSize(m_imageInfo.width_, m_imageInfo.height_);
 							}
 							if (SUCCEEDED(hr))
 							{
@@ -1404,9 +1413,9 @@ void COperatorConsole3View::SaveImage16ToFile(const wchar_t *pathname, const std
 							}
 							if (SUCCEEDED(hr))
 							{
-								UINT stride = (m_width * 16 + 7) / 8;
-								UINT bufferSize = m_height * stride;
-								hr = sp_frame->WritePixels(m_height, stride, bufferSize, LPBYTE(&image[0]));
+								UINT stride = (m_imageInfo.width_ * 16 + 7) / 8;
+								UINT bufferSize = m_imageInfo.height_ * stride;
+								hr = sp_frame->WritePixels(m_imageInfo.height_, stride, bufferSize, LPBYTE(&image[0]));
 							}
 							// Commit frame
 							if (SUCCEEDED(hr))
@@ -1650,11 +1659,11 @@ afx_msg void COperatorConsole3View::OnMouseMove(UINT nFlags, CPoint point)
 		CPoint ptScroll = GetDeviceScrollPosition();
 		ptImage += ptScroll;
 		bool outsideImage = true;
-		if ((ptImage.y >= 0) && (ptImage.y < m_height))
+		if ((ptImage.y >= 0) && (ptImage.y < m_imageInfo.height_))
 		{
-			if ((ptImage.x >= 0) && (ptImage.x < m_width))
+			if ((ptImage.x >= 0) && (ptImage.x < m_imageInfo.width_))
 			{
-				int offset = ptImage.y * m_width + ptImage.x;
+				int offset = ptImage.y * m_imageInfo.width_ + ptImage.x;
 				color = m_image8Data[offset];
 				outsideImage = false;
 			}
@@ -1743,8 +1752,8 @@ void COperatorConsole3View::OnViewZoom14()
 	pMenu->CheckMenuItem(ID_VIEW_ZOOM31, MF_UNCHECKED | MF_BYCOMMAND);
 	pMenu->CheckMenuItem(ID_VIEW_ZOOM41, MF_UNCHECKED | MF_BYCOMMAND);
 	CSize sizeTotal;
-	sizeTotal.cx = m_width / 4;
-	sizeTotal.cy = m_height / 4;
+	sizeTotal.cx = m_imageInfo.width_ / 4;
+	sizeTotal.cy = m_imageInfo.height_ / 4;
 	SetScrollSizes(MM_TEXT, sizeTotal);
 }
 
@@ -1763,8 +1772,8 @@ void COperatorConsole3View::OnViewZoom12()
 	pMenu->CheckMenuItem(ID_VIEW_ZOOM31, MF_UNCHECKED | MF_BYCOMMAND);
 	pMenu->CheckMenuItem(ID_VIEW_ZOOM41, MF_UNCHECKED | MF_BYCOMMAND);
 	CSize sizeTotal;
-	sizeTotal.cx = m_width/2;
-	sizeTotal.cy = m_height/2;
+	sizeTotal.cx = m_imageInfo.width_/2;
+	sizeTotal.cy = m_imageInfo.height_/2;
 	SetScrollSizes(MM_TEXT, sizeTotal);
 }
 
@@ -1783,8 +1792,8 @@ void COperatorConsole3View::OnViewZoom11()
 	pMenu->CheckMenuItem(ID_VIEW_ZOOM31, MF_UNCHECKED | MF_BYCOMMAND);
 	pMenu->CheckMenuItem(ID_VIEW_ZOOM41, MF_UNCHECKED | MF_BYCOMMAND);
 	CSize sizeTotal;
-	sizeTotal.cx = m_width;
-	sizeTotal.cy = m_height;
+	sizeTotal.cx = m_imageInfo.width_;
+	sizeTotal.cy = m_imageInfo.height_;
 	SetScrollSizes(MM_TEXT, sizeTotal);
 }
 
@@ -1803,8 +1812,8 @@ void COperatorConsole3View::OnViewZoom21()
 	pMenu->CheckMenuItem(ID_VIEW_ZOOM31, MF_UNCHECKED | MF_BYCOMMAND);
 	pMenu->CheckMenuItem(ID_VIEW_ZOOM41, MF_UNCHECKED | MF_BYCOMMAND);
 	CSize sizeTotal;
-	sizeTotal.cx = m_width*2;
-	sizeTotal.cy = m_height*2;
+	sizeTotal.cx = m_imageInfo.width_*2;
+	sizeTotal.cy = m_imageInfo.height_*2;
 	SetScrollSizes(MM_TEXT, sizeTotal);
 }
 
@@ -1823,8 +1832,8 @@ void COperatorConsole3View::OnViewZoom31()
 	pMenu->CheckMenuItem(ID_VIEW_ZOOM31, MF_CHECKED | MF_BYCOMMAND);
 	pMenu->CheckMenuItem(ID_VIEW_ZOOM41, MF_UNCHECKED | MF_BYCOMMAND);
 	CSize sizeTotal;
-	sizeTotal.cx = m_width*3;
-	sizeTotal.cy = m_height*3;
+	sizeTotal.cx = m_imageInfo.width_*3;
+	sizeTotal.cy = m_imageInfo.height_*3;
 	SetScrollSizes(MM_TEXT, sizeTotal);
 }
 
@@ -1843,8 +1852,8 @@ void COperatorConsole3View::OnViewZoom41()
 	pMenu->CheckMenuItem(ID_VIEW_ZOOM31, MF_UNCHECKED | MF_BYCOMMAND);
 	pMenu->CheckMenuItem(ID_VIEW_ZOOM41, MF_CHECKED | MF_BYCOMMAND);
 	CSize sizeTotal;
-	sizeTotal.cx = m_width*4;
-	sizeTotal.cy = m_height*4;
+	sizeTotal.cx = m_imageInfo.width_*4;
+	sizeTotal.cy = m_imageInfo.height_*4;
 	SetScrollSizes(MM_TEXT, sizeTotal);
 }
 

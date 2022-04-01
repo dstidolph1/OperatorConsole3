@@ -17,7 +17,7 @@ protected:
 public:
 	static CameraIMX241& Instance();
 
-	bool ConvertVideoTo8Bit(const uint16_t* pSrc, long sourceLength, uint8_t* pDest, long destLength, CameraImageInfo& imageInfo);
+	bool ConvertVideoTo8Bit(std::vector<uint8_t> &src, std::vector<uint8_t> &dest, CameraImageInfo& imageInfo);
 
 	int GetMinIntegrationTime() { return minIntegrationTime; }
 	int GetMaxIntegrationTime() { return maxIntegrationTime; }

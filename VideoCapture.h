@@ -121,7 +121,9 @@ public:
 
 class VideoCapture{
 private:
-	int gWidth; 
+	HRESULT LoadCameraFrame(); // Load current frame from camera into m_cameraFrame
+
+	int gWidth;
 	int gHeight;
 	ISampleGrabber *pGrabber; 
 	long pBufferSize; 
@@ -140,7 +142,7 @@ private:
 	IAMVideoProcAmp	*m_pVideoProcAmp;
 
 	AM_MEDIA_TYPE *pmtConfig;
-	std::vector<uint16_t> m_cameraFrame;
+	std::vector<uint8_t> m_cameraFrame;
 	 
 public:	
 	VideoCapture();
@@ -188,9 +190,7 @@ public:
 
 	HRESULT RestartVideoCapture();
 
-    HRESULT GetCameraFrame(long &sizeBuffer, long *buffer);
-
-	HRESULT GetCameraFrame(std::vector<uint8_t>& image8Data, std::vector<uint16_t> &image16Data, CRect &rcMaxValue, uint8_t &maxPixelValue, CameraImageInfo& imageInfo);
+	HRESULT GetCameraFrame(std::vector<uint8_t>& image8Data, std::vector<uint16_t> &image16Data, CameraImageInfo& imageInfo);
 };
 
 #endif

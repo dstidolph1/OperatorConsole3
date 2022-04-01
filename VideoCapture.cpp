@@ -101,20 +101,22 @@ bool VideoCapture::ReadCameraInfo(CameraInfoParser& cameraInfo)
   return success;
 }
 
-HRESULT VideoCapture::GetCameraFrame(long& sizeBuffer, long* buffer)
+HRESULT VideoCapture::LoadCameraFrame()
 {
   HRESULT captureResult = E_FAIL;
   if (sgGetSampleGrabber())
   {
     long num = 0;
     captureResult = sgGetSampleGrabber()->GetCurrentBuffer(&num, NULL);
-    if (SUCCEEDED(captureResult) && (num <= sizeBuffer))
+    if (SUCCEEDED(captureResult))
     {
-        memset(buffer, 0, num);
-        captureResult = sgGetSampleGrabber()->GetCurrentBuffer(&num, buffer);
+      if (num != m_cameraFrame.size())
+      {
+        m_cameraFrame.resize(num);
+      }
+      if (num > 0)
+        captureResult = sgGetSampleGrabber()->GetCurrentBuffer(&num, reinterpret_cast<long*>(&m_cameraFrame[0]));
     }
-    if (0 == sizeBuffer)
-      captureResult = E_FAIL;
     switch (captureResult)
     {
     case VFW_E_NOT_CONNECTED:
@@ -143,8 +145,7 @@ HRESULT VideoCapture::GetCameraFrame(long& sizeBuffer, long* buffer)
   return captureResult;
 }
 
-HRESULT VideoCapture::GetCameraFrame(std::vector<uint8_t>& image8Data, std::vector<uint16_t>& image10Data, 
-  CRect& rcMaxValue, uint8_t& maxPixelValue, CameraImageInfo& imageInfo)
+HRESULT VideoCapture::GetCameraFrame(std::vector<uint8_t>& image8Data, std::vector<uint16_t>& image10Data, CameraImageInfo& imageInfo)
 {
   HRESULT hr = E_FAIL;
   long length = gWidth * gHeight;
@@ -153,9 +154,11 @@ HRESULT VideoCapture::GetCameraFrame(std::vector<uint8_t>& image8Data, std::vect
   {
     image10Data.resize(size16Buffer);
   }
-  const char* p8Bit = reinterpret_cast<char*>(&image10Data[0]);
-  hr = GetCameraFrame(size16Buffer, (long*)&image10Data[0]);
-  maxPixelValue = 0;
+  if (image8Data.size() != length)
+  {
+    image8Data.resize(length);
+  }
+  hr = LoadCameraFrame();
   if (SUCCEEDED(hr))
   {
     if (image8Data.size() != length)
@@ -166,8 +169,10 @@ HRESULT VideoCapture::GetCameraFrame(std::vector<uint8_t>& image8Data, std::vect
     case BitShiftType::shift1: CameraIMX241::Instance().SetBitShift(1); break;
     case BitShiftType::shift2: CameraIMX241::Instance().SetBitShift(2); break;
     }
-    if (CameraIMX241::Instance().ConvertVideoTo8Bit(&image10Data[0], size16Buffer, &image8Data[0], length, imageInfo))
+    if (CameraIMX241::Instance().ConvertVideoTo8Bit(m_cameraFrame, image8Data, imageInfo))
     {
+      gWidth = imageInfo.width_;
+      gHeight = imageInfo.height_;
       hr = S_OK;
     }
   }
@@ -873,8 +878,9 @@ HRESULT VideoCapture::StartVideoCapture()
       //AM_MEDIA_TYPE *pmtConfig;
       hr = pConfig->GetStreamCaps(iFormat, &pmtConfig, (BYTE*)&scc);
       if (SUCCEEDED(hr)) {
-        long desiredSize = (scc.InputSize.cx*16/10) * scc.InputSize.cy * 5 / 4;
+        unsigned long desiredSize = (scc.InputSize.cx*16/10) * scc.InputSize.cy * 5 / 4;
         printf("*iformat: %d\n", iFormat);
+        bool okResolution = (scc.InputSize.cx == 1865) || (scc.InputSize.cx == 1620);
         /* Examine the format, and possibly use it. */
         if ((pmtConfig->majortype == MEDIATYPE_Video) &&
           //-----------------------
@@ -883,8 +889,7 @@ HRESULT VideoCapture::StartVideoCapture()
             (pmtConfig->subtype == MEDIASUBTYPE_YUY2)) &&
           //-----------------------
           (pmtConfig->formattype == FORMAT_VideoInfo) &&
-          (pmtConfig->lSampleSize == desiredSize) &&
-            (scc.InputSize.cy == 1944)) // 2235
+          (pmtConfig->lSampleSize == desiredSize) && okResolution)
         {
           if (pmtConfig->subtype == MEDIASUBTYPE_EYELOCK_GREY_LOW_10_OF_16) {
             printf("GUID MEDIASUBTYPE_EYELOCK_GREY_LOW_10_OF_16\n");
