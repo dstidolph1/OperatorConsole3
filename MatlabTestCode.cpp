@@ -45,13 +45,13 @@ bool MatlabTestCode::Initialize()
 		s += e.what();
 		LOGMSG_ERROR(s.c_str());
 		AfxGetMainWnd()->SetWindowTextA(s.c_str());
-		MessageBeep(MB_ICONWARNING);
+		//MessageBeep(MB_ICONWARNING);
 	}
 	catch (const std::exception& exc) {
 		std::string s = "std::exception in initMATLABLibrary: ";
 		s += exc.what();
 		AfxGetMainWnd()->SetWindowTextA(s.c_str());
-		MessageBeep(MB_ICONWARNING);
+		//MessageBeep(MB_ICONWARNING);
 		LOGMSG_ERROR(s.c_str());
 	}
 	return success;
@@ -112,7 +112,7 @@ bool MatlabTestCode::RunTestFullChartMTF50(std::vector<uint16_t>& image, int wid
 		s += e.what();
 		LOGMSG_ERROR(s.c_str());
 		AfxGetMainWnd()->SetWindowTextA(s.c_str());
-		MessageBeep(MB_ICONWARNING);
+		//MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::data::InvalidArrayTypeException& e)
 	{
@@ -120,7 +120,7 @@ bool MatlabTestCode::RunTestFullChartMTF50(std::vector<uint16_t>& image, int wid
 		s += e.what();
 		LOGMSG_ERROR(s.c_str());
 		AfxGetMainWnd()->SetWindowTextA(s.c_str());
-		MessageBeep(MB_ICONWARNING);
+		//MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::data::InvalidMemoryLayoutException& e)
 	{
@@ -128,7 +128,7 @@ bool MatlabTestCode::RunTestFullChartMTF50(std::vector<uint16_t>& image, int wid
 		s += e.what();
 		LOGMSG_ERROR(s.c_str());
 		AfxGetMainWnd()->SetWindowTextA(s.c_str());
-		MessageBeep(MB_ICONWARNING);
+		//MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::data::InvalidDimensionsInRowMajorArrayException& e)
 	{
@@ -136,7 +136,7 @@ bool MatlabTestCode::RunTestFullChartMTF50(std::vector<uint16_t>& image, int wid
 		s += e.what();
 		LOGMSG_ERROR(s.c_str());
 		AfxGetMainWnd()->SetWindowTextA(s.c_str());
-		MessageBeep(MB_ICONWARNING);
+		//MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::data::NumberOfElementsExceedsMaximumException& e)
 	{
@@ -144,7 +144,7 @@ bool MatlabTestCode::RunTestFullChartMTF50(std::vector<uint16_t>& image, int wid
 		s += e.what();
 		LOGMSG_ERROR(s.c_str());
 		AfxGetMainWnd()->SetWindowTextA(s.c_str());
-		MessageBeep(MB_ICONWARNING);
+		//MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::Exception& e)
 	{
@@ -152,7 +152,7 @@ bool MatlabTestCode::RunTestFullChartMTF50(std::vector<uint16_t>& image, int wid
 		s += e.what();
 		LOGMSG_ERROR(s.c_str());
 		AfxGetMainWnd()->SetWindowTextA(s.c_str());
-		MessageBeep(MB_ICONWARNING);
+		//MessageBeep(MB_ICONWARNING);
 	}
 	return success;
 }
@@ -215,7 +215,7 @@ bool MatlabTestCode::RunTestFullChartSNR(std::vector<uint16_t>& image, int width
 		s += e.what();
 		LOGMSG_ERROR(s.c_str());
 		AfxGetMainWnd()->SetWindowTextA(s.c_str());
-		MessageBeep(MB_ICONWARNING);
+		//MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::data::InvalidArrayTypeException& e)
 	{
@@ -223,7 +223,7 @@ bool MatlabTestCode::RunTestFullChartSNR(std::vector<uint16_t>& image, int width
 		s += e.what();
 		LOGMSG_ERROR(s.c_str());
 		AfxGetMainWnd()->SetWindowTextA(s.c_str());
-		MessageBeep(MB_ICONWARNING);
+		//MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::data::InvalidMemoryLayoutException& e)
 	{
@@ -231,7 +231,7 @@ bool MatlabTestCode::RunTestFullChartSNR(std::vector<uint16_t>& image, int width
 		s += e.what();
 		LOGMSG_ERROR(s.c_str());
 		AfxGetMainWnd()->SetWindowTextA(s.c_str());
-		MessageBeep(MB_ICONWARNING);
+		//MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::data::InvalidDimensionsInRowMajorArrayException& e)
 	{
@@ -239,7 +239,7 @@ bool MatlabTestCode::RunTestFullChartSNR(std::vector<uint16_t>& image, int width
 		s += e.what();
 		LOGMSG_ERROR(s.c_str());
 		AfxGetMainWnd()->SetWindowTextA(s.c_str());
-		MessageBeep(MB_ICONWARNING);
+		//MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::data::NumberOfElementsExceedsMaximumException& e)
 	{
@@ -247,7 +247,7 @@ bool MatlabTestCode::RunTestFullChartSNR(std::vector<uint16_t>& image, int width
 		s += e.what();
 		LOGMSG_ERROR(s.c_str());
 		AfxGetMainWnd()->SetWindowTextA(s.c_str());
-		MessageBeep(MB_ICONWARNING);
+		//MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::Exception& e)
 	{
@@ -255,7 +255,7 @@ bool MatlabTestCode::RunTestFullChartSNR(std::vector<uint16_t>& image, int width
 		s += e.what();
 		LOGMSG_ERROR(s.c_str());
 		AfxGetMainWnd()->SetWindowTextA(s.c_str());
-		MessageBeep(MB_ICONWARNING);
+		//MessageBeep(MB_ICONWARNING);
 	}
 	return success;
 }
@@ -308,7 +308,7 @@ bool MatlabTestCode::RunTestQuickMTF50(std::vector<uint8_t>& image, int width, i
 		s += e.what();
 		LOGMSG_ERROR(s.c_str());
 		AfxGetMainWnd()->SetWindowTextA(s.c_str());
-		MessageBeep(MB_ICONWARNING);
+		//MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::data::InvalidArrayTypeException& e)
 	{
@@ -316,7 +316,7 @@ bool MatlabTestCode::RunTestQuickMTF50(std::vector<uint8_t>& image, int width, i
 		s += e.what();
 		LOGMSG_ERROR(s.c_str());
 		AfxGetMainWnd()->SetWindowTextA(s.c_str());
-		MessageBeep(MB_ICONWARNING);
+		//MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::data::InvalidMemoryLayoutException& e)
 	{
@@ -324,7 +324,7 @@ bool MatlabTestCode::RunTestQuickMTF50(std::vector<uint8_t>& image, int width, i
 		s += e.what();
 		LOGMSG_ERROR(s.c_str());
 		AfxGetMainWnd()->SetWindowTextA(s.c_str());
-		MessageBeep(MB_ICONWARNING);
+		//MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::data::InvalidDimensionsInRowMajorArrayException& e)
 	{
@@ -332,7 +332,7 @@ bool MatlabTestCode::RunTestQuickMTF50(std::vector<uint8_t>& image, int width, i
 		s += e.what();
 		LOGMSG_ERROR(s.c_str());
 		AfxGetMainWnd()->SetWindowTextA(s.c_str());
-		MessageBeep(MB_ICONWARNING);
+		//MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::data::NumberOfElementsExceedsMaximumException& e)
 	{
@@ -340,7 +340,7 @@ bool MatlabTestCode::RunTestQuickMTF50(std::vector<uint8_t>& image, int width, i
 		s += e.what();
 		LOGMSG_ERROR(s.c_str());
 		AfxGetMainWnd()->SetWindowTextA(s.c_str());
-		MessageBeep(MB_ICONWARNING);
+		//MessageBeep(MB_ICONWARNING);
 	}
 	catch (matlab::Exception& e)
 	{
@@ -348,7 +348,7 @@ bool MatlabTestCode::RunTestQuickMTF50(std::vector<uint8_t>& image, int width, i
 		s += e.what();
 		LOGMSG_ERROR(s.c_str());
 		AfxGetMainWnd()->SetWindowTextA(s.c_str());
-		MessageBeep(MB_ICONWARNING);
+		//MessageBeep(MB_ICONWARNING);
 	}
 	return success;
 }
