@@ -880,7 +880,7 @@ HRESULT VideoCapture::StartVideoCapture()
       if (SUCCEEDED(hr)) {
         unsigned long desiredSize = (scc.InputSize.cx*16/10) * scc.InputSize.cy * 5 / 4;
         printf("*iformat: %d\n", iFormat);
-        bool okResolution = (scc.InputSize.cx == 1865) || (scc.InputSize.cx == 1620);
+        bool okResolution = (scc.InputSize.cx == 2535) || (scc.InputSize.cx == 1865) || (scc.InputSize.cx == 1620);
         /* Examine the format, and possibly use it. */
         if ((pmtConfig->majortype == MEDIATYPE_Video) &&
           //-----------------------
@@ -889,7 +889,8 @@ HRESULT VideoCapture::StartVideoCapture()
             (pmtConfig->subtype == MEDIASUBTYPE_YUY2)) &&
           //-----------------------
           (pmtConfig->formattype == FORMAT_VideoInfo) &&
-          (pmtConfig->lSampleSize == desiredSize) && okResolution)
+          (pmtConfig->lSampleSize == desiredSize) &&
+          okResolution)
         {
           if (pmtConfig->subtype == MEDIASUBTYPE_EYELOCK_GREY_LOW_10_OF_16) {
             printf("GUID MEDIASUBTYPE_EYELOCK_GREY_LOW_10_OF_16\n");

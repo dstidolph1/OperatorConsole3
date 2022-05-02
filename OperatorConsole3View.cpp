@@ -443,7 +443,9 @@ void COperatorConsole3View::OnInitialUpdate()
 	{
 		OnCameraUseTop8Bits();
 		m_pTestingThread = AfxBeginThread(ThreadProc, this); // <<== START THE THREAD
+#if defined(USE_MATLAB)
 		m_pProgramStateThread = AfxBeginThread(AnalyzeFrameThreadProc, this);
+#endif
 	}
 	else
 	{
@@ -716,7 +718,16 @@ bool COperatorConsole3View::GetFrame(std::vector<uint8_t>& image8Data, std::vect
 	CRect rcWhiteSquare(1188, 582, 1317, 733);
 	{
 		WriteLock lock(m_pictureLock);
+		ULONGLONG start = GetTickCount64();
 		HRESULT hr = m_vidCapture.GetCameraFrame(image8Data, image16Data, imageInfo); // This will load the bitmap with the current frame
+		ULONGLONG end = GetTickCount64();
+		char buffer[64];
+		ULONGLONG diff = end - start;
+		int ms = int(diff);
+		double fps = 1000.0 / double(ms);
+		char buff[256];
+		sprintf_s(buff, sizeof(buff), "%d ms or %f fps\n", ms, fps);
+		OutputDebugString(buff);
 		m_FrameNumber++;
 		success = SUCCEEDED(hr);
 	}
@@ -1544,8 +1555,10 @@ void COperatorConsole3View::OnDestroy()
 	LOGMSG_DEBUG("Get threads to shut down");
 	m_ThreadShutdown = true;
 	m_ShutdownEvent.SetEvent();
-	WaitForSingleObject(m_pProgramStateThread->m_hThread, 1000);
 	WaitForSingleObject(m_pTestingThread->m_hThread, 1000);
+#if defined(USE_MATLAB)
+	WaitForSingleObject(m_pProgramStateThread->m_hThread, 1000);
+#endif
 	LOGMSG_DEBUG("Threads shut down, continue shutting down...");
 	m_loggerFactory.Close();
 	CScrollView::OnDestroy();

@@ -161,12 +161,10 @@ protected:
 	OperatorConsoleState m_programState;
 	CameraImageInfo m_imageInfo;
 	bool m_stateChange;
-#ifdef USE_MATLAB
 	MatlabTestCode m_matlabTestCode;
 	std::vector<QuickMTF50Data> m_outputQuickMTF50;
 	std::vector<FullChartSNRData> m_outputFullChartSNR;
 	std::vector<FullChartMTF50Data> m_outputFullChartMTF50;
-#endif
 	std::vector<CPoint> registrationCoordinates;
 	CameraInfoParser m_CameraInfo;
 	std::vector<CPoint> m_GreyBoxes;
