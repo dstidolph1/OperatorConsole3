@@ -297,7 +297,7 @@ bool CameraIMX241::ConvertVideoTo8Bit(std::vector<uint8_t>& src, std::vector<uin
 			if (YUV422_8_2 == imageInfo.VideoFormat)
 			{
 				int numPixels = imageInfo.width_ * imageInfo.height_;
-				int pixelBlockCount = numPixels / 5; // each pixel block is 4 pixels (upper 8 bits) followed by 1 byte holding bottom 2 bits of each pixel in the group 
+				int pixelBlockCount = numPixels / 4; // each pixel block is 4 pixels (upper 8 bits) followed by 1 byte holding bottom 2 bits of each pixel in the group 
 				const uint8_t* p8BitSrc = pSrc;
 				uint8_t* pConvertedPixel = &dest[0];
 				switch (imageInfo.bit_shift_) {
