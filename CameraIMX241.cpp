@@ -86,6 +86,9 @@ typedef struct {
 #define EYELOCK_STAMP_VERSION_4 4
 #define EYELOCK_STAMP_SIZE_4 sizeof(FIRMINFO_4)
 
+#define EYELOCK_STAMP_VERSION_5 5
+#define EYELOCK_STAMP_SIZE_5 sizeof(FIRMINFO_4)
+
 enum PackingMode {
 
 	RAW10_10_16 = 0x01,  // Raw 10/16 format that will pad the highest 6 bits with 0's. This was used with the legacy code. 1.32 and before
@@ -146,7 +149,37 @@ bool CameraIMX241::ProcessCameraInfo(const unsigned char* pSrc, long sourceImage
 		const FIRMINFO_2* pFirmware2Info = reinterpret_cast<const FIRMINFO_2*>(pSrc);
 		const FIRMINFO_3* pFirmware3Info = reinterpret_cast<const FIRMINFO_3*>(pSrc);
 		const FIRMINFO_4* pFirmware4Info = reinterpret_cast<const FIRMINFO_4*>(pSrc);
-		if ((EYELOCK_STAMP_VERSION_4 == pFirmware4Info->EyelockStampVersion) &&
+		const FIRMINFO_4* pFirmware5Info = reinterpret_cast<const FIRMINFO_4*>(pSrc);
+		if ((EYELOCK_STAMP_VERSION_5 == pFirmware5Info->EyelockStampVersion) &&
+			(EYELOCK_STAMP_SIZE_5 == pFirmware5Info->EyelockStampSize))
+		{
+			imageInfo.frameHasMetaInformation = true;
+			imageInfo.FirmwareMajor = pFirmware4Info->FirmwareMajor;
+			imageInfo.FirmwareMinor = pFirmware4Info->FirmwareMinor;
+			imageInfo.IntegrationTimeValue = pFirmware4Info->IntegrationTimeValue;
+			imageInfo.isHighAmbientLightModeOn = pFirmware4Info->isHighAmbientLightModeOn;
+			imageInfo.isLeftIRLEDOn = pFirmware4Info->isLeftIRLEDOn;
+			imageInfo.isRightIRLEDOn = pFirmware4Info->isRightIRLEDOn;
+			imageInfo.isTransitionFrame = pFirmware4Info->isTransitionFrame;
+			imageInfo.IntegrationTimeMin = pFirmware4Info->IntegrationTimeMin;
+			imageInfo.IntegrationTimeMax = pFirmware4Info->IntegrationTimeMax;
+			if (RAW10_10_16 == pFirmware4Info->PackingMode)
+			{
+				imageInfo.VideoFormat = CX3VideoFormat::RAW10;
+			}
+			else if (RAW10_16_16 == pFirmware4Info->PackingMode)
+			{
+				imageInfo.VideoFormat = CX3VideoFormat::YUV422_8_2;
+			}
+			else
+			{
+				imageInfo.VideoFormat = CX3VideoFormat::YUV422_8_2;
+			}
+			imageInfo.height_ = pFirmware4Info->ImageOutputHeight;
+			imageInfo.width_ = pFirmware4Info->ImageOutputWidth;
+			success = true;
+		}
+		else if ((EYELOCK_STAMP_VERSION_4 == pFirmware4Info->EyelockStampVersion) &&
 				(EYELOCK_STAMP_SIZE_4 == pFirmware4Info->EyelockStampSize))
 		{
 			imageInfo.frameHasMetaInformation = true;
