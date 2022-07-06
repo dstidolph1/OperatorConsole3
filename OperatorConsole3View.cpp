@@ -31,7 +31,7 @@ using namespace Gdiplus;
 
 // Global declaration
 //#define USE_SOFTWARE_FOR_STATION
-#define DRAW_MAIN_THREAD
+//#define DRAW_MAIN_THREAD
 
 using _com_util::CheckError;
 using container = std::vector<std::vector<bool>>;

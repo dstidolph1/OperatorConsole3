@@ -34,9 +34,9 @@
 
 typedef enum
 {
-	shift2, // Use top 8 bits
+	shift0, // Use bottom 8 Bits
 	shift1, // Use middle 8 bits
-	shift0 // Use bottom 8 Bits
+	shift2 // Use top 8 bits
 } BitShiftType;
 
 typedef enum vendor_cmd_t {

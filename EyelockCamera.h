@@ -18,7 +18,9 @@ enum CX3VideoFormat {
 };
 
 const unsigned long long CX241v1 = 0x4358323431763100; // Reads : 'C', 'X', '2', '4', '1', 'v', '1', 0x00
+const unsigned long long CX412v1 = 0x4358343132763100; // Reads : 'C', 'X', '4', '1', '2', 'v', '1', 0x00
 #define CameraImageInfo_Version1 1
+#define CameraImageInfo_Version2 2
 
 /// @brief This is the first version of this structure.
 /// Tracks the information gathered from the frame.  With new
@@ -51,8 +53,13 @@ struct CameraImageInfo1
 	unsigned long long quadrantLuminescence[4];
 };
 
+struct CameraImageInfo2 : public CameraImageInfo1
+{
+	bool bayerRGBData = false;
+};
+
 /// @brief Add new CameraInfo# and set to the latest.
-typedef struct CameraImageInfo1 CameraImageInfo;
+typedef struct CameraImageInfo2 CameraImageInfo;
 
 /// @brief This class provides the definition of the CameraImageInfo class
 /// and the functions for loading/saving PGM files with that data embedded.

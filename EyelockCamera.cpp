@@ -54,7 +54,30 @@ bool EyelockCamera::LoadPGM(const std::string& filename, unsigned char* pDest, i
 				{
 					if (CameraImageInfo_Version1 == pCameraFrameInfo->version)
 					{
-						imageInfo = *reinterpret_cast<CameraImageInfo1*>(pDest); // We have the camera info, so copy it!
+						imageInfo = *reinterpret_cast<CameraImageInfo2*>(pDest); // We have the camera info, so copy it!
+						success = true;
+					}
+					if (CameraImageInfo_Version2 == pCameraFrameInfo->version)
+					{
+						imageInfo = *reinterpret_cast<CameraImageInfo2*>(pDest); // We have the camera info, so copy it!
+						success = true;
+					}
+					else
+					{
+						success = false;
+					}
+				}
+				else if (CX412v1 == pCameraFrameInfo->MagicNum)
+				{
+					if (CameraImageInfo_Version1 == pCameraFrameInfo->version)
+					{
+						imageInfo = *reinterpret_cast<CameraImageInfo*>(pDest); // We have the camera info, so copy it!
+						imageInfo.bayerRGBData = false;
+						success = true;
+					}
+					if (CameraImageInfo_Version2 == pCameraFrameInfo->version)
+					{
+						imageInfo = *reinterpret_cast<CameraImageInfo*>(pDest); // We have the camera info, so copy it!
 						success = true;
 					}
 					else
@@ -166,7 +189,30 @@ bool EyelockCamera::LoadPGM(const std::string& filename, std::vector<unsigned ch
 				{
 					if (CameraImageInfo_Version1 == pCameraFrameInfo->version)
 					{
-						imageInfo = *reinterpret_cast<CameraImageInfo1*>(&pixels[0]); // We have the camera info, so copy it!
+						imageInfo = *reinterpret_cast<CameraImageInfo*>(&pixels[0]); // We have the camera info, so copy it!
+						imageInfo.bayerRGBData = false;
+						success = true;
+					}
+					if (CameraImageInfo_Version2 == pCameraFrameInfo->version)
+					{
+						imageInfo = *reinterpret_cast<CameraImageInfo*>(&pixels[0]); // We have the camera info, so copy it!
+						success = true;
+					}
+					else
+					{
+						success = false;
+					}
+				}
+				if (CX412v1 == pCameraFrameInfo->MagicNum)
+				{
+					if (CameraImageInfo_Version1 == pCameraFrameInfo->version)
+					{
+						imageInfo = *reinterpret_cast<CameraImageInfo*>(&pixels[0]); // We have the camera info, so copy it!
+						success = true;
+					}
+					if (CameraImageInfo_Version2 == pCameraFrameInfo->version)
+					{
+						imageInfo = *reinterpret_cast<CameraImageInfo*>(&pixels[0]); // We have the camera info, so copy it!
 						success = true;
 					}
 					else

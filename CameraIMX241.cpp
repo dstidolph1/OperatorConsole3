@@ -77,6 +77,24 @@ typedef struct {
 	uint16_t ImageOutputHeight;
 }FIRMINFO_4;
 
+typedef struct {
+	uint64_t EyelockStamp; // 0x4579656c6f636b00 Reads: 'E', 'y', 'e', 'l', 'o', 'c', 'k', 0x00
+	uint8_t EyelockStampVersion;
+	uint16_t EyelockStampSize;
+	uint8_t FirmwareMajor;
+	uint8_t FirmwareMinor;
+	uint8_t isHighAmbientLightModeOn;
+	uint8_t isLeftIRLEDOn;
+	uint8_t isRightIRLEDOn;
+	uint8_t isTransitionFrame;
+	uint8_t IntegrationTimeMin;
+	uint16_t IntegrationTimeMax;
+	uint16_t IntegrationTimeValue;
+	uint8_t PackingMode;
+	uint16_t ImageOutputWidth;
+	uint16_t ImageOutputHeight;
+} FIRMINFO_5;
+
 #define EYELOCK_STAMP_VERSION_2 1
 #define EYELOCK_STAMP_SIZE_2	176 //in bits
 
@@ -87,7 +105,7 @@ typedef struct {
 #define EYELOCK_STAMP_SIZE_4 sizeof(FIRMINFO_4)
 
 #define EYELOCK_STAMP_VERSION_5 5
-#define EYELOCK_STAMP_SIZE_5 sizeof(FIRMINFO_4)
+#define EYELOCK_STAMP_SIZE_5 sizeof(FIRMINFO_5)
 
 enum PackingMode {
 
@@ -97,6 +115,27 @@ enum PackingMode {
 
 const uint64_t EyelockStampValidation1 = 0x4579656c6f636b00;
 CameraIMX241* CameraIMX241::m_This = nullptr;
+
+CameraIMX241::CameraIMX241() :
+	minIntegrationTime(DEFAULT_MIN_INTEGRATION_TIME),
+	maxIntegrationTime(DEFAULT_MAX_INTEGRATION_TIME)
+{
+	for (int index = 0; index < 256; index++)
+	{
+		double red = round(double(index) * 0.98);
+		if (red > 255.0)
+			red = 255.0;
+		double green = round(double(index) * 1.03);
+		if (green > 255.0)
+			green = 255.0;
+		double blue = round(double(index) * 0.97);
+		if (blue > 255.0)
+			blue = 255.0;
+		m_red[index] = uint8_t(red);// int(double(index) * 0.98);
+		m_green[index] = uint8_t(green);// int(double(index) * 1.03);
+		m_blue[index] = uint8_t(blue);// int(double(index) * 0.97);
+	}
+}
 
 CameraIMX241& CameraIMX241::Instance()
 {
@@ -153,21 +192,24 @@ bool CameraIMX241::ProcessCameraInfo(const unsigned char* pSrc, long sourceImage
 		if ((EYELOCK_STAMP_VERSION_5 == pFirmware5Info->EyelockStampVersion) &&
 			(EYELOCK_STAMP_SIZE_5 == pFirmware5Info->EyelockStampSize))
 		{
+			imageInfo.bayerRGBData = true;
+			imageInfo.MagicNum = CX412v1;
+			imageInfo.version = CameraImageInfo_Version2;
 			imageInfo.frameHasMetaInformation = true;
-			imageInfo.FirmwareMajor = pFirmware4Info->FirmwareMajor;
-			imageInfo.FirmwareMinor = pFirmware4Info->FirmwareMinor;
-			imageInfo.IntegrationTimeValue = pFirmware4Info->IntegrationTimeValue;
-			imageInfo.isHighAmbientLightModeOn = pFirmware4Info->isHighAmbientLightModeOn;
-			imageInfo.isLeftIRLEDOn = pFirmware4Info->isLeftIRLEDOn;
-			imageInfo.isRightIRLEDOn = pFirmware4Info->isRightIRLEDOn;
-			imageInfo.isTransitionFrame = pFirmware4Info->isTransitionFrame;
-			imageInfo.IntegrationTimeMin = pFirmware4Info->IntegrationTimeMin;
-			imageInfo.IntegrationTimeMax = pFirmware4Info->IntegrationTimeMax;
-			if (RAW10_10_16 == pFirmware4Info->PackingMode)
+			imageInfo.FirmwareMajor = pFirmware5Info->FirmwareMajor;
+			imageInfo.FirmwareMinor = pFirmware5Info->FirmwareMinor;
+			imageInfo.IntegrationTimeValue = pFirmware5Info->IntegrationTimeValue;
+			imageInfo.isHighAmbientLightModeOn = pFirmware5Info->isHighAmbientLightModeOn;
+			imageInfo.isLeftIRLEDOn = pFirmware5Info->isLeftIRLEDOn;
+			imageInfo.isRightIRLEDOn = pFirmware5Info->isRightIRLEDOn;
+			imageInfo.isTransitionFrame = pFirmware5Info->isTransitionFrame;
+			imageInfo.IntegrationTimeMin = pFirmware5Info->IntegrationTimeMin;
+			imageInfo.IntegrationTimeMax = pFirmware5Info->IntegrationTimeMax;
+			if (RAW10_10_16 == pFirmware5Info->PackingMode)
 			{
 				imageInfo.VideoFormat = CX3VideoFormat::RAW10;
 			}
-			else if (RAW10_16_16 == pFirmware4Info->PackingMode)
+			else if (RAW10_16_16 == pFirmware5Info->PackingMode)
 			{
 				imageInfo.VideoFormat = CX3VideoFormat::YUV422_8_2;
 			}
@@ -325,8 +367,6 @@ bool CameraIMX241::ConvertVideoTo8Bit(std::vector<uint8_t>& src, std::vector<uin
 				dest.resize(outputSize);
 			}
 			int xQuad = 0, yQuad = 0;
-			char buffer[256];
-			sprintf_s(buffer, sizeof(buffer), "ConvertVideoTo8Bit Frame #%d, isTransitionFrame=%d, shift=%d", imageInfo.frameNumber, (int)imageInfo.isTransitionFrame, imageInfo.bit_shift_);
 			if (YUV422_8_2 == imageInfo.VideoFormat)
 			{
 				int numPixels = imageInfo.width_ * imageInfo.height_;
@@ -348,7 +388,7 @@ bool CameraIMX241::ConvertVideoTo8Bit(std::vector<uint8_t>& src, std::vector<uin
 							shifted = 0xff; // make it white because bits above are on
 							imageInfo.num_forced_white_++;
 						}
-						*pConvertedPixel++ = shifted;
+						*pConvertedPixel++ = ConvertByte(shifted, xQuad, yQuad);
 						imageInfo.histogram_[shifted]++;
 						IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
 						shifted = 0xff & pixel2Value;
@@ -357,7 +397,7 @@ bool CameraIMX241::ConvertVideoTo8Bit(std::vector<uint8_t>& src, std::vector<uin
 							shifted = 0xff; // make it white because bits above are on
 							imageInfo.num_forced_white_++;
 						}
-						*pConvertedPixel++ = shifted;
+						*pConvertedPixel++ = ConvertByte(shifted, xQuad, yQuad);
 						imageInfo.histogram_[shifted]++;
 						IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
 						shifted = 0xff & pixel3Value;
@@ -366,7 +406,7 @@ bool CameraIMX241::ConvertVideoTo8Bit(std::vector<uint8_t>& src, std::vector<uin
 							shifted = 0xff; // make it white because bits above are on
 							imageInfo.num_forced_white_++;
 						}
-						*pConvertedPixel++ = shifted;
+						*pConvertedPixel++ = ConvertByte(shifted, xQuad, yQuad);
 						imageInfo.histogram_[shifted]++;
 						IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
 						shifted = 0xff & pixel4Value;
@@ -375,7 +415,7 @@ bool CameraIMX241::ConvertVideoTo8Bit(std::vector<uint8_t>& src, std::vector<uin
 							shifted = 0xff; // make it white because bits above are on
 							imageInfo.num_forced_white_++;
 						}
-						*pConvertedPixel++ = shifted;
+						*pConvertedPixel++ = ConvertByte(shifted, xQuad, yQuad);
 						imageInfo.histogram_[shifted]++;
 						IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
 					}
@@ -394,7 +434,7 @@ bool CameraIMX241::ConvertVideoTo8Bit(std::vector<uint8_t>& src, std::vector<uin
 							shifted = 0xff; // make it white because bits above are on
 							imageInfo.num_forced_white_++;
 						}
-						*pConvertedPixel++ = shifted;
+						*pConvertedPixel++ = ConvertByte(shifted, xQuad, yQuad);
 						imageInfo.histogram_[shifted]++;
 						IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
 						shifted = 0xff & pixel2Value;
@@ -403,7 +443,7 @@ bool CameraIMX241::ConvertVideoTo8Bit(std::vector<uint8_t>& src, std::vector<uin
 							shifted = 0xff; // make it white because bits above are on
 							imageInfo.num_forced_white_++;
 						}
-						*pConvertedPixel++ = shifted;
+						*pConvertedPixel++ = ConvertByte(shifted, xQuad, yQuad);
 						imageInfo.histogram_[shifted]++;
 						IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
 						shifted = 0xff & pixel3Value;
@@ -412,7 +452,7 @@ bool CameraIMX241::ConvertVideoTo8Bit(std::vector<uint8_t>& src, std::vector<uin
 							shifted = 0xff; // make it white because bits above are on
 							imageInfo.num_forced_white_++;
 						}
-						*pConvertedPixel++ = shifted;
+						*pConvertedPixel++ = ConvertByte(shifted, xQuad, yQuad);
 						imageInfo.histogram_[shifted]++;
 						IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
 						shifted = 0xff & pixel4Value;
@@ -421,7 +461,7 @@ bool CameraIMX241::ConvertVideoTo8Bit(std::vector<uint8_t>& src, std::vector<uin
 							shifted = 0xff; // make it white because bits above are on
 							imageInfo.num_forced_white_++;
 						}
-						*pConvertedPixel++ = shifted;
+						*pConvertedPixel++ = ConvertByte(shifted, xQuad, yQuad);
 						imageInfo.histogram_[shifted]++;
 						IncQuad(shifted, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
 					}
@@ -431,16 +471,16 @@ bool CameraIMX241::ConvertVideoTo8Bit(std::vector<uint8_t>& src, std::vector<uin
 					for (auto nPixel = 0; nPixel < pixelBlockCount; nPixel++) {
 						int offset = nPixel * 5;
 						const PackedPixelData* pPixelBlock = reinterpret_cast<const PackedPixelData*>(&p8BitSrc[offset]);
-						*pConvertedPixel++ = pPixelBlock->pixel1Upper8;
+						*pConvertedPixel++ = ConvertByte(pPixelBlock->pixel1Upper8, xQuad, yQuad);
 						imageInfo.histogram_[pPixelBlock->pixel1Upper8]++;
 						IncQuad(pPixelBlock->pixel1Upper8, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
-						*pConvertedPixel++ = pPixelBlock->pixel2Upper8;
+						*pConvertedPixel++ = ConvertByte(pPixelBlock->pixel2Upper8, xQuad, yQuad);
 						imageInfo.histogram_[pPixelBlock->pixel2Upper8]++;
 						IncQuad(pPixelBlock->pixel2Upper8, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
-						*pConvertedPixel++ = pPixelBlock->pixel1Upper8;
+						*pConvertedPixel++ = ConvertByte(pPixelBlock->pixel3Upper8, xQuad, yQuad);
 						imageInfo.histogram_[pPixelBlock->pixel3Upper8]++;
 						IncQuad(pPixelBlock->pixel3Upper8, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
-						*pConvertedPixel++ = pPixelBlock->pixel1Upper8;
+						*pConvertedPixel++ = ConvertByte(pPixelBlock->pixel4Upper8, xQuad, yQuad);
 						imageInfo.histogram_[pPixelBlock->pixel4Upper8]++;
 						IncQuad(pPixelBlock->pixel4Upper8, xQuad, yQuad, imageInfo.quadrantLuminescence, imageInfo.width_, imageInfo.height_);
 					}
